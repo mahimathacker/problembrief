@@ -1,7 +1,7 @@
 """Pydantic models (for Claude structured outputs) and the LangGraph state."""
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +11,7 @@ class SourceItem(BaseModel):
 
     id: str  # short stable id, e.g. "hn-3", "reddit-7"
     source: str  # "hackernews" | "reddit"
-    subreddit: str | None = None
+    subreddit: Optional[str] = None  # Optional[] (not `| None`) for Python 3.9
     title: str
     text: str = ""
     url: str = ""

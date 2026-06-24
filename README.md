@@ -16,8 +16,10 @@ read first; widen from there.
 fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brief → save_results
 ```
 
-- **fetch_sources** — HN front page (Algolia API) + top-of-day posts from your
-  subreddits. Both are unauthenticated; one failing source won't kill the run.
+- **fetch_sources** — Hacker News (Algolia API), Lobsters (`hottest.json`), and Dev.to
+  (`/api/articles`) — all no-auth and on by default. Reddit is **opt-in** and currently
+  gated behind Reddit's Responsible Builder Policy, so it stays off unless you have
+  approved API credentials. One failing source won't kill the run.
 - **extract_pain_points** — Claude reads each batch and pulls concrete, buildable
   problems, each tagged with a category and 1–5 scores (pain, frequency,
   buildability, market signal, personal interest), citing its source posts.

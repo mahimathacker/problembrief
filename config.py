@@ -23,8 +23,13 @@ SUBREDDITS = [
     if s.strip()
 ]
 
-# How many items to pull from each source (HN front page + each subreddit).
+# How many items to pull from each source (HN, Lobsters, each subreddit).
 MAX_PER_SOURCE = int(os.getenv("RADAR_MAX_PER_SOURCE", "25"))
+
+# Reddit is opt-in: it now 403s unauthenticated scraping, so it only runs if you
+# add free API credentials (see README "Enable Reddit"). Left blank = skipped.
+REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
+REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
 
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
