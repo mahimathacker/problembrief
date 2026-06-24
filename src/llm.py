@@ -17,9 +17,8 @@ _INTERESTS = ", ".join(config.INTERESTS)
 def _render_items(items: list[SourceItem]) -> str:
     lines = []
     for it in items:
-        where = it.subreddit and f"r/{it.subreddit}" or it.source
         lines.append(
-            f"[{it.id}] ({where}, {it.points} pts, {it.num_comments} comments)\n"
+            f"[{it.id}] ({it.source}, {it.points} pts, {it.num_comments} comments)\n"
             f"  title: {it.title}\n"
             f"  body: {it.text or '(link-only post)'}"
         )
@@ -80,22 +79,28 @@ and personal_interest as the considered best estimate.
 - Do not invent new pain points; only consolidate what's given."""
 
 
+def _composite(obj) -> float:
+    """Weighted sum of the five 1-5 sub-scores (works on PainPoint or Opportunity)."""
+    return round(sum(getattr(obj, k) * w for k, w in config.WEIGHTS.items()), 3)
+
+
 def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
     if not pain_points:
         return []
-    payload = json.dumps([p.model_dump() for p in pain_points], indent=2)
+    # Pre-rank by composite and cap, so the model's output stays within budget and
+    # we dedupe the strongest signals rather than the long tail.
+    ranked = sorted(pain_points, key=_composite, reverse=True)[: config.MAX_PAIN_POINTS]
+    payload = json.dumps([p.model_dump() for p in ranked])
     resp = _client.messages.parse(
         model=config.MODEL,
-        max_tokens=8000,
+        max_tokens=16000,
         system=_DEDUPE_SYS,
         messages=[{"role": "user", "content": f"Pain points:\n{payload}"}],
         output_format=Deduped,
     )
     opps = resp.parsed_output.opportunities if resp.parsed_output else []
     for o in opps:
-        o.composite = round(
-            sum(getattr(o, k) * w for k, w in config.WEIGHTS.items()), 3
-        )
+        o.composite = _composite(o)
     opps.sort(key=lambda o: o.composite, reverse=True)
     return opps
 
@@ -111,7 +116,8 @@ def write_brief(opps: list[Opportunity], date_str: str, item_count: int) -> str:
     top = opps[: config.TOP_N]
     payload = json.dumps([o.model_dump() for o in top], indent=2)
     user = f"""Date: {date_str}
-Scanned {item_count} posts from Hacker News + Reddit. Top opportunities (already scored, \
+Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub. Top \
+opportunities (already scored, \
 sorted by composite):
 
 {payload}
@@ -124,7 +130,7 @@ who'd pay, a buildability read, and the score line `pain/freq/build/market/inter
 Keep it skimmable."""
     msg = _client.messages.create(
         model=config.MODEL,
-        max_tokens=4000,
+        max_tokens=8000,
         thinking={"type": "adaptive"},
         system=_BRIEF_SYS,
         messages=[{"role": "user", "content": user}],

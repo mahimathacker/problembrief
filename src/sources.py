@@ -1,10 +1,10 @@
 """Fetch + lightly clean posts from developer communities.
 
-Sources:
-  - Hacker News  (Algolia API)      — no auth, works out of the box
-  - Lobsters     (hottest.json)     — no auth, works out of the box
-  - Reddit       (official OAuth)    — opt-in; needs free API credentials, because
-                                       Reddit now 403s unauthenticated .json scraping
+Sources (all no-auth, on by default):
+  - Hacker News  (Algolia API)
+  - Lobsters     (hottest.json)
+  - Dev.to       (/api/articles)
+  - GitHub       (issue Search API; optional GITHUB_TOKEN raises the rate limit)
 """
 from __future__ import annotations
 
@@ -112,64 +112,54 @@ def fetch_devto(limit: int) -> list[SourceItem]:
     return items
 
 
-# --- Reddit (official OAuth, opt-in) -------------------------------------
+# --- GitHub Issues -------------------------------------------------------
 
-def _reddit_token() -> str | None:
-    """Application-only OAuth token. Returns None if creds aren't configured."""
-    if not (config.REDDIT_CLIENT_ID and config.REDDIT_CLIENT_SECRET):
-        return None
-    try:
-        r = httpx.post(
-            "https://www.reddit.com/api/v1/access_token",
-            data={"grant_type": "client_credentials"},
-            auth=(config.REDDIT_CLIENT_ID, config.REDDIT_CLIENT_SECRET),
-            headers={"User-Agent": config.USER_AGENT},
-            timeout=20,
-        )
-        r.raise_for_status()
-        return r.json().get("access_token")
-    except Exception as e:
-        print(f"  ! reddit auth failed: {e}")
-        return None
+def fetch_github(queries: list[str], limit: int, token: str = "") -> list[SourceItem]:
+    """Search GitHub issues for pain signals (feature requests, 'is there a way to').
 
-
-def fetch_reddit(subreddits: list[str], limit: int) -> list[SourceItem]:
-    """Top-of-day posts via Reddit's OAuth API. Skipped if no credentials."""
-    token = _reddit_token()
-    if not token:
-        print("  - reddit: skipped (set REDDIT_CLIENT_ID/SECRET to enable — see README)")
-        return []
+    Works unauthenticated; a token just raises the rate limit. Each result is a
+    real, documented developer need — high signal for buildable pain points.
+    """
+    headers = {
+        "User-Agent": config.USER_AGENT,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     items: list[SourceItem] = []
-    headers = {"Authorization": f"bearer {token}", "User-Agent": config.USER_AGENT}
+    seen: set[str] = set()
     with httpx.Client(timeout=20, headers=headers) as c:
-        for sub in subreddits:
+        for qi, q in enumerate(queries):
             try:
                 r = c.get(
-                    f"https://oauth.reddit.com/r/{sub}/top",
-                    params={"t": "day", "limit": limit},
+                    "https://api.github.com/search/issues",
+                    params={"q": q, "sort": "reactions", "order": "desc", "per_page": limit},
                 )
                 r.raise_for_status()
-                children = r.json().get("data", {}).get("children", [])
+                hits = r.json().get("items", [])
             except Exception as e:
-                print(f"  ! reddit/{sub} skipped: {e}")
+                print(f"  ! github query {qi + 1} skipped: {e}")
                 continue
 
-            for j, child in enumerate(children):
-                d = child.get("data", {})
-                title = d.get("title") or ""
-                if not title or d.get("stickied"):
+            for j, h in enumerate(hits):
+                if h.get("pull_request"):  # Search mixes issues + PRs; drop PRs
                     continue
+                url = h.get("html_url") or ""
+                title = h.get("title") or ""
+                if not title or url in seen:
+                    continue
+                seen.add(url)
                 items.append(
                     SourceItem(
-                        id=f"reddit-{sub}-{j}",
-                        source="reddit",
-                        subreddit=sub,
+                        id=f"github-{qi}-{j}",
+                        source="github",
                         title=title,
-                        text=_clean(d.get("selftext")),
-                        url=f"https://www.reddit.com{d.get('permalink', '')}",
-                        points=int(d.get("ups") or 0),
-                        num_comments=int(d.get("num_comments") or 0),
+                        text=_clean(h.get("body")),
+                        url=url,
+                        points=int((h.get("reactions") or {}).get("total_count") or 0),
+                        num_comments=int(h.get("comments") or 0),
                     )
                 )
     return items
@@ -184,6 +174,7 @@ def fetch_all() -> list[SourceItem]:
         ("hackernews", lambda: fetch_hackernews(config.MAX_PER_SOURCE)),
         ("lobsters", lambda: fetch_lobsters(config.MAX_PER_SOURCE)),
         ("devto", lambda: fetch_devto(config.MAX_PER_SOURCE)),
+        ("github", lambda: fetch_github(config.GITHUB_QUERIES, config.MAX_PER_SOURCE, config.GITHUB_TOKEN)),
     ):
         try:
             got = fn()
@@ -191,10 +182,5 @@ def fetch_all() -> list[SourceItem]:
             items += got
         except Exception as e:
             print(f"  ! {name} skipped: {e}")
-
-    reddit = fetch_reddit(config.SUBREDDITS, config.MAX_PER_SOURCE)
-    if reddit:
-        print(f"  - reddit: {len(reddit)} items")
-    items += reddit
 
     return items

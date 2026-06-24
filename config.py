@@ -14,22 +14,24 @@ load_dotenv()
 MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8")
 
 # --- Sources -------------------------------------------------------------
-SUBREDDITS = [
-    s.strip()
-    for s in os.getenv(
-        "RADAR_SUBREDDITS",
-        "devtools,programming,SaaS,startups,ExperiencedDevs,LocalLLaMA",
-    ).split(",")
-    if s.strip()
-]
-
-# How many items to pull from each source (HN, Lobsters, each subreddit).
+# How many items to pull from each source (HN, Lobsters, Dev.to, GitHub).
 MAX_PER_SOURCE = int(os.getenv("RADAR_MAX_PER_SOURCE", "25"))
 
-# Reddit is opt-in: it now 403s unauthenticated scraping, so it only runs if you
-# add free API credentials (see README "Enable Reddit"). Left blank = skipped.
-REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
-REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
+# GitHub Issues search runs unauthenticated, but a free token raises the rate
+# limit (10 -> 30 search req/min) and avoids 403s. Optional.
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+
+# Pain-signal queries for the GitHub issue search (one source item per result).
+# Override with RADAR_GITHUB_QUERIES (semicolon-separated).
+GITHUB_QUERIES = [
+    q.strip()
+    for q in os.getenv(
+        "RADAR_GITHUB_QUERIES",
+        '"feature request" in:title type:issue state:open comments:>3'
+        ';"is there a way to" in:title type:issue state:open comments:>2',
+    ).split(";")
+    if q.strip()
+]
 
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
@@ -62,6 +64,10 @@ WEIGHTS = {
     "personal_interest": 0.10,
 }
 
+# Cap how many (highest-scoring) pain points get sent to the dedupe step. Keeps the
+# model's output under its token budget and focuses on the strongest signals.
+MAX_PAIN_POINTS = int(os.getenv("RADAR_MAX_PAIN_POINTS", "40"))
+
 # How many opportunities make the brief.
 TOP_N = int(os.getenv("RADAR_TOP_N", "8"))
 
@@ -69,5 +75,5 @@ TOP_N = int(os.getenv("RADAR_TOP_N", "8"))
 ROOT = Path(__file__).parent
 BRIEFS_DIR = ROOT / "briefs"
 
-# A descriptive User-Agent keeps HN/Reddit happy on unauthenticated reads.
+# A descriptive User-Agent keeps the source APIs happy on unauthenticated reads.
 USER_AGENT = "problembrief/0.1 (personal research tool)"
