@@ -26,24 +26,62 @@ def _clean(text: str | None, limit: int = 1200) -> str:
     return text[:limit]
 
 
+def _append_comments(item: SourceItem, comments: list[str]) -> None:
+    """Fold a thread's top comments into the item's text (capped to bound tokens)."""
+    if comments:
+        joined = "\n- ".join(comments)
+        item.text = (item.text + f"\n\nTop comments:\n- {joined}").strip()[:4000]
+
+
+def _hn_comments(object_id: str, client: httpx.Client, n: int) -> list[str]:
+    """Top comments for an HN item via the Algolia item endpoint (breadth-first)."""
+    try:
+        r = client.get(f"https://hn.algolia.com/api/v1/items/{object_id}")
+        r.raise_for_status()
+        data = r.json()
+    except Exception:
+        return []
+    out: list[str] = []
+    queue = list(data.get("children") or [])
+    while queue and len(out) < n:
+        node = queue.pop(0)
+        t = _clean(node.get("text"), 400)
+        if t:
+            out.append(t)
+        queue.extend(node.get("children") or [])
+    return out
+
+
+def _gh_comments(comments_url: str, client: httpx.Client, n: int) -> list[str]:
+    """Top comments for a GitHub issue via its comments_url."""
+    try:
+        r = client.get(comments_url, params={"per_page": n})
+        r.raise_for_status()
+        data = r.json()
+    except Exception:
+        return []
+    return [t for cm in data[:n] if (t := _clean(cm.get("body"), 400))]
+
+
 # --- Hacker News ---------------------------------------------------------
 
 def fetch_hackernews(limit: int) -> list[SourceItem]:
-    """HN front-page stories via the free Algolia API (no key, no auth)."""
-    url = "https://hn.algolia.com/api/v1/search"
-    params = {"tags": "front_page", "hitsPerPage": limit}
+    """HN front-page stories (Algolia API), enriched with top comments."""
     with httpx.Client(timeout=20, headers={"User-Agent": config.USER_AGENT}) as c:
-        r = c.get(url, params=params)
+        r = c.get(
+            "https://hn.algolia.com/api/v1/search",
+            params={"tags": "front_page", "hitsPerPage": limit},
+        )
         r.raise_for_status()
         hits = r.json().get("hits", [])
 
-    items: list[SourceItem] = []
-    for i, h in enumerate(hits):
-        title = h.get("title") or h.get("story_title") or ""
-        if not title:
-            continue
-        items.append(
-            SourceItem(
+        items: list[SourceItem] = []
+        rows = []  # (item, object_id, num_comments) for comment enrichment
+        for i, h in enumerate(hits):
+            title = h.get("title") or h.get("story_title") or ""
+            if not title:
+                continue
+            item = SourceItem(
                 id=f"hn-{i}",
                 source="hackernews",
                 title=title,
@@ -52,7 +90,15 @@ def fetch_hackernews(limit: int) -> list[SourceItem]:
                 points=int(h.get("points") or 0),
                 num_comments=int(h.get("num_comments") or 0),
             )
-        )
+            items.append(item)
+            rows.append((item, str(h.get("objectID")), item.num_comments))
+
+        if config.FETCH_COMMENTS:
+            for item, oid, _ in sorted(rows, key=lambda x: x[2], reverse=True)[
+                : config.COMMENTS_MAX_THREADS
+            ]:
+                _append_comments(item, _hn_comments(oid, c, config.COMMENTS_PER_THREAD))
+
     return items
 
 
@@ -129,6 +175,7 @@ def fetch_github(queries: list[str], limit: int, token: str = "") -> list[Source
         headers["Authorization"] = f"Bearer {token}"
 
     items: list[SourceItem] = []
+    rows = []  # (item, comments_url, num_comments) for comment enrichment
     seen: set[str] = set()
     with httpx.Client(timeout=20, headers=headers) as c:
         for qi, q in enumerate(queries):
@@ -151,17 +198,25 @@ def fetch_github(queries: list[str], limit: int, token: str = "") -> list[Source
                 if not title or url in seen:
                     continue
                 seen.add(url)
-                items.append(
-                    SourceItem(
-                        id=f"github-{qi}-{j}",
-                        source="github",
-                        title=title,
-                        text=_clean(h.get("body")),
-                        url=url,
-                        points=int((h.get("reactions") or {}).get("total_count") or 0),
-                        num_comments=int(h.get("comments") or 0),
-                    )
+                item = SourceItem(
+                    id=f"github-{qi}-{j}",
+                    source="github",
+                    title=title,
+                    text=_clean(h.get("body")),
+                    url=url,
+                    points=int((h.get("reactions") or {}).get("total_count") or 0),
+                    num_comments=int(h.get("comments") or 0),
                 )
+                items.append(item)
+                rows.append((item, h.get("comments_url") or "", item.num_comments))
+
+        if config.FETCH_COMMENTS:
+            for item, curl, _ in sorted(rows, key=lambda x: x[2], reverse=True)[
+                : config.COMMENTS_MAX_THREADS
+            ]:
+                if curl:
+                    _append_comments(item, _gh_comments(curl, c, config.COMMENTS_PER_THREAD))
+
     return items
 
 

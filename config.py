@@ -17,6 +17,12 @@ MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8")
 # How many items to pull from each source (HN, Lobsters, Dev.to, GitHub).
 MAX_PER_SOURCE = int(os.getenv("RADAR_MAX_PER_SOURCE", "25"))
 
+# Comment enrichment: pull discussion from the busiest threads (where real pain
+# shows — agreement, workarounds, "is there a way to…"). Costs extra HTTP requests.
+FETCH_COMMENTS = os.getenv("RADAR_FETCH_COMMENTS", "1") not in ("0", "false", "False")
+COMMENTS_MAX_THREADS = int(os.getenv("RADAR_COMMENTS_MAX_THREADS", "10"))  # per source
+COMMENTS_PER_THREAD = int(os.getenv("RADAR_COMMENTS_PER_THREAD", "6"))
+
 # GitHub Issues search runs unauthenticated, but a free token raises the rate
 # limit (10 -> 30 search req/min) and avoids 403s. Optional.
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")

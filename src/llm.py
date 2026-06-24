@@ -27,17 +27,29 @@ def _render_items(items: list[SourceItem]) -> str:
 
 # --- 1. extract ----------------------------------------------------------
 
-_EXTRACT_SYS = f"""You analyze posts from developer communities and extract concrete, \
-buildable PAIN POINTS — real frustrations, repeated complaints, or unmet needs that \
-someone could turn into a product.
+_EXTRACT_SYS = f"""You analyze posts AND their comment threads from developer \
+communities and extract concrete, buildable PAIN POINTS — real frustrations, repeated \
+complaints, or unmet needs someone could turn into a product.
 
-Rules:
-- Only extract genuine pain points. Skip announcements, hype, and pure news.
+Reading the input:
+- A post may include a "Top comments:" section. Treat comments as the strongest \
+evidence — agreement, "me too", described workarounds, and "is there a way to…" all \
+signal real, shared pain.
+
+What to extract:
+- Be SELECTIVE. Quality over coverage: return at most the 3-4 strongest pain points \
+per batch, or zero if there's no real signal. A vague theme is worse than nothing.
+- Prefer specific problems ("X has no good way to do Y") over broad topics ("AI is hard").
+- `evidence` must be a real quote or close paraphrase from the post/comments.
 - Each pain point must cite the source id(s) it came from.
 - category must be exactly one of: {_CATS}.
-- Score each 1-5. personal_interest reflects fit with the user's interests: {_INTERESTS}.
-- Prefer specific problems ("X has no good way to do Y") over vague themes.
-- It's fine to return zero pain points for a batch with no real signal."""
+
+Scoring (1-5 — calibrate honestly; most things are 2-3, reserve 5):
+- pain: 1 = mild annoyance, 5 = blocks real work / felt daily.
+- frequency: 1 = one mention, 5 = echoed across many posts/comments.
+- buildability: 1 = needs a huge moat or scale, 5 = a small team could ship a useful MVP in weeks.
+- market_signal: 1 = no sign anyone'd pay, 5 = people asking for it or paying for workarounds.
+- personal_interest: fit with the user's interests: {_INTERESTS}."""
 
 
 def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[PainPoint]:
@@ -66,14 +78,16 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
 
 # --- 2. dedupe -----------------------------------------------------------
 
-_DEDUPE_SYS = """You are given a list of pain points extracted from many posts. \
-Merge duplicates and near-duplicates into a single opportunity each.
+_DEDUPE_SYS = """You are given pain points extracted from many posts. Consolidate them \
+into a focused set of opportunities.
 
 Rules:
-- Combine source_ids from all merged items.
-- When merging, set frequency to reflect how many distinct posts mention it (higher = \
-more posts). Take the strongest pain/market_signal among merged items; keep buildability \
-and personal_interest as the considered best estimate.
+- Merge duplicates and near-duplicates into one opportunity; combine their source_ids.
+- DROP anything vague, one-off, or not genuinely buildable — a short sharp list beats a \
+long mushy one.
+- When merging, set frequency to reflect how many distinct posts/comments mention it; \
+take the strongest pain/market_signal among merged items; keep buildability and \
+personal_interest as your best estimate.
 - Keep the clearest one-sentence summary and the single best piece of evidence.
 - Leave `composite` at 0 — it is computed downstream.
 - Do not invent new pain points; only consolidate what's given."""
