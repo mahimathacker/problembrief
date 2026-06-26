@@ -29,9 +29,11 @@ def dedupe_similar(state: RadarState) -> RadarState:
 
 def generate_daily_brief(state: RadarState) -> RadarState:
     opps = state.get("deduped", [])
+    raw = state.get("raw_items", [])
     print(f"[4/5] writing brief from {len(opps)} opportunities…")
     today = date.today().isoformat()
-    brief = llm.write_brief(opps, today, len(state.get("raw_items", [])))
+    id_to_url = {it.id: it.url for it in raw}
+    brief = llm.write_brief(opps, today, len(raw), id_to_url)
     return {"brief_markdown": brief}
 
 

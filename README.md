@@ -18,8 +18,10 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
 
 - **fetch_sources** — Hacker News (Algolia), Lobsters (`hottest.json`), Dev.to
   (`/api/articles`), and GitHub Issues (Search API, querying feature-requests and
-  "is there a way to…" issues by reactions) — all no-auth and on by default. A free
-  `GITHUB_TOKEN` just raises GitHub's rate limit. One failing source won't kill the run.
+  "is there a way to…" issues by reactions) — all no-auth and on by default. The
+  busiest HN + GitHub threads are enriched with their **top comments**, where the real
+  pain shows. A free `GITHUB_TOKEN` just raises GitHub's rate limit. One failing source
+  won't kill the run.
 - **extract_pain_points** — Claude reads each batch and pulls concrete, buildable
   problems, each tagged with a category and 1–5 scores (pain, frequency,
   buildability, market signal, personal interest), citing its source posts.
@@ -59,8 +61,7 @@ Everything tunable lives in `config.py` (override via `.env`):
 
 ## Roadmap
 
-- **V1.x** — pull HN/GitHub comments (where the real pain hides), add GitHub
-  Discussions + Product Hunt, persist runs to Supabase.
+- **V1.x** — add GitHub Discussions + Product Hunt, persist runs to Supabase.
 - **V2** — wrap as an API; deliver the brief to Telegram / email / Notion / Slack on a
   9 AM cron. Add a dashboard with save / dismiss / mark-useful.
 

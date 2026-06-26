@@ -126,20 +126,43 @@ studies developer problems every morning. Tone: direct, opinionated, concrete. \
 No fluff, no hype. Use Markdown."""
 
 
-def write_brief(opps: list[Opportunity], date_str: str, item_count: int) -> str:
+def write_brief(
+    opps: list[Opportunity],
+    date_str: str,
+    item_count: int,
+    id_to_url: dict[str, str] | None = None,
+) -> str:
+    id_to_url = id_to_url or {}
     top = opps[: config.TOP_N]
-    payload = json.dumps([o.model_dump() for o in top], indent=2)
+
+    # Resolve each opportunity's source_ids to real URLs so the model can cite them
+    # verbatim instead of inventing links.
+    payload_objs = []
+    for o in top:
+        d = o.model_dump()
+        urls, seen = [], set()
+        for sid in d.get("source_ids", []):
+            u = id_to_url.get(sid)
+            if u and u not in seen:
+                seen.add(u)
+                urls.append(u)
+        d["sources"] = urls[:5]
+        payload_objs.append(d)
+    payload = json.dumps(payload_objs, indent=2)
+
     user = f"""Date: {date_str}
 Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub. Top \
-opportunities (already scored, \
-sorted by composite):
+opportunities (already scored, sorted by composite):
 
 {payload}
 
 Write the brief with:
 1. A 2-3 sentence '## TL;DR' of the day's strongest signal.
 2. '## Opportunities' — one '### ' entry per opportunity with: the problem, why now, \
-who'd pay, a buildability read, and the score line `pain/freq/build/market/interest`.
+who'd pay, a buildability read, the score line `pain/freq/build/market/interest`, and \
+finally a `**Sources:** ` line of Markdown links built ONLY from that opportunity's \
+`sources` URLs, each labeled by its site (GitHub / Hacker News / Lobsters / Dev.to). \
+Copy URLs verbatim — never invent one; omit the line if `sources` is empty.
 3. '## Watchlist' — one line on weaker-but-interesting threads, if any.
 Keep it skimmable."""
     msg = _client.messages.create(
