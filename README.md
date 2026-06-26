@@ -59,6 +59,32 @@ Everything tunable lives in `config.py` (override via `.env`):
 - `RADAR_TOP_N` — opportunities included in the brief
 - `WEIGHTS` — composite-score weighting (edit in `config.py`)
 
+## Email setup (optional)
+
+Get the brief in your inbox after each run, via [Resend](https://resend.com) (a
+transactional email service — **not** Google/Gmail, nothing to set up in Google Cloud):
+
+1. Sign up at <https://resend.com> (free — 100 emails/day).
+2. **API Keys → Create API Key**, copy the `re_...` value.
+3. Add to `.env`:
+   ```
+   RESEND_API_KEY=re_...
+   EMAIL_TO=your-resend-signup-email@example.com
+   ```
+   On the free tier (no domain) you can only send to your **Resend signup address**,
+   from the shared `onboarding@resend.dev` sender. Verify a domain later to send
+   anywhere and from your own address.
+
+If `RESEND_API_KEY` is unset, delivery is just skipped.
+
+## Automate (daily, in the cloud)
+
+[`.github/workflows/daily.yml`](.github/workflows/daily.yml) runs the brief on a cron
+via GitHub Actions — no laptop required. In your repo: **Settings → Secrets and
+variables → Actions** add `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, and `EMAIL_TO`
+(`GITHUB_TOKEN` is provided automatically). Adjust the cron time in the workflow (it's
+UTC). Use the **Actions** tab → *Run workflow* to test it on demand.
+
 ## Roadmap
 
 - **V1.x** — add GitHub Discussions + Product Hunt, persist runs to Supabase.

@@ -25,11 +25,11 @@ class PainPoint(BaseModel):
     category: str = Field(description="One of the configured categories.")
     evidence: str = Field(description="A short quote or paraphrase showing the pain.")
     source_ids: list[str] = Field(description="ids of the posts this came from.")
-    pain: int = Field(ge=1, le=5, description="How acute/frequent the frustration is.")
-    frequency: int = Field(ge=1, le=5, description="How often this comes up across posts.")
-    buildability: int = Field(ge=1, le=5, description="How feasible for a small team to ship.")
-    market_signal: int = Field(ge=1, le=5, description="Evidence people would pay/adopt.")
-    personal_interest: int = Field(ge=1, le=5, description="Fit with the user's interests.")
+    pain: int = Field(description="1-5: how acute/frequent the frustration is.")
+    frequency: int = Field(description="1-5: how often this comes up across posts.")
+    buildability: int = Field(description="1-5: how feasible for a small team to ship.")
+    market_signal: int = Field(description="1-5: evidence people would pay/adopt.")
+    personal_interest: int = Field(description="1-5: fit with the user's interests.")
 
 
 class Extraction(BaseModel):

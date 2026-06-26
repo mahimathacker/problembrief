@@ -1,17 +1,83 @@
-"""All Claude calls: extract pain points, dedupe into opportunities, write brief."""
+"""All LLM calls: extract pain points, dedupe into opportunities, write brief.
+
+Provider-agnostic — set RADAR_PROVIDER=anthropic (default) or openai.
+"""
 from __future__ import annotations
 
 import json
 
-import anthropic
-
 import config
 from src.schema import Deduped, Extraction, Opportunity, PainPoint, SourceItem
 
-_client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
-
 _CATS = ", ".join(config.CATEGORIES)
 _INTERESTS = ", ".join(config.INTERESTS)
+
+# Clients are created lazily so you only need the key for the provider you use.
+_anthropic_client = None
+_openai_client = None
+
+
+def _anthropic():
+    global _anthropic_client
+    if _anthropic_client is None:
+        import anthropic
+
+        _anthropic_client = anthropic.Anthropic()
+    return _anthropic_client
+
+
+def _openai():
+    global _openai_client
+    if _openai_client is None:
+        from openai import OpenAI
+
+        _openai_client = OpenAI()
+    return _openai_client
+
+
+def _parse(system: str, user: str, schema, max_tokens: int):
+    """Structured output → a validated pydantic object (or None)."""
+    if config.PROVIDER == "openai":
+        completion = _openai().beta.chat.completions.parse(
+            model=config.OPENAI_MODEL,
+            max_completion_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            response_format=schema,
+        )
+        return completion.choices[0].message.parsed
+    resp = _anthropic().messages.parse(
+        model=config.MODEL,
+        max_tokens=max_tokens,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        output_format=schema,
+    )
+    return resp.parsed_output
+
+
+def _complete(system: str, user: str, max_tokens: int) -> str:
+    """Plain-text completion."""
+    if config.PROVIDER == "openai":
+        completion = _openai().chat.completions.create(
+            model=config.OPENAI_MODEL,
+            max_completion_tokens=max_tokens,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        return completion.choices[0].message.content or ""
+    msg = _anthropic().messages.create(
+        model=config.MODEL,
+        max_tokens=max_tokens,
+        thinking={"type": "adaptive"},
+        system=system,
+        messages=[{"role": "user", "content": user}],
+    )
+    return "".join(b.text for b in msg.content if b.type == "text")
 
 
 def _render_items(items: list[SourceItem]) -> str:
@@ -56,20 +122,12 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
     out: list[PainPoint] = []
     for start in range(0, len(items), batch_size):
         batch = items[start : start + batch_size]
-        resp = _client.messages.parse(
-            model=config.MODEL,
-            max_tokens=8000,
-            system=_EXTRACT_SYS,
-            messages=[
-                {
-                    "role": "user",
-                    "content": "Extract pain points from these posts:\n\n"
-                    + _render_items(batch),
-                }
-            ],
-            output_format=Extraction,
+        parsed = _parse(
+            _EXTRACT_SYS,
+            "Extract pain points from these posts:\n\n" + _render_items(batch),
+            Extraction,
+            8000,
         )
-        parsed = resp.parsed_output
         if parsed:
             out.extend(parsed.pain_points)
         print(f"  - extracted from batch {start // batch_size + 1}: {len(out)} total")
@@ -105,14 +163,8 @@ def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
     # we dedupe the strongest signals rather than the long tail.
     ranked = sorted(pain_points, key=_composite, reverse=True)[: config.MAX_PAIN_POINTS]
     payload = json.dumps([p.model_dump() for p in ranked])
-    resp = _client.messages.parse(
-        model=config.MODEL,
-        max_tokens=16000,
-        system=_DEDUPE_SYS,
-        messages=[{"role": "user", "content": f"Pain points:\n{payload}"}],
-        output_format=Deduped,
-    )
-    opps = resp.parsed_output.opportunities if resp.parsed_output else []
+    parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 16000)
+    opps = parsed.opportunities if parsed else []
     for o in opps:
         o.composite = _composite(o)
     opps.sort(key=lambda o: o.composite, reverse=True)
@@ -165,11 +217,4 @@ finally a `**Sources:** ` line of Markdown links built ONLY from that opportunit
 Copy URLs verbatim — never invent one; omit the line if `sources` is empty.
 3. '## Watchlist' — one line on weaker-but-interesting threads, if any.
 Keep it skimmable."""
-    msg = _client.messages.create(
-        model=config.MODEL,
-        max_tokens=8000,
-        thinking={"type": "adaptive"},
-        system=_BRIEF_SYS,
-        messages=[{"role": "user", "content": user}],
-    )
-    return "".join(b.text for b in msg.content if b.type == "text")
+    return _complete(_BRIEF_SYS, user, 8000)

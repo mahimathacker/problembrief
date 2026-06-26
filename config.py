@@ -1,4 +1,4 @@
-"""Central config for AI Builder Radar. Reads .env, exposes plain values."""
+"""Central config for Problembrief. Reads .env, exposes plain values."""
 from __future__ import annotations
 
 import os
@@ -8,10 +8,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Model ---------------------------------------------------------------
-# Default to the most capable Claude model. The extraction/scoring quality is
-# the whole point of this tool, so don't downgrade without a reason.
+# --- Provider & model ----------------------------------------------------
+# Backend LLM: "anthropic" (default) or "openai". Switch with RADAR_PROVIDER=openai
+# when you're low on one provider's credits.
+PROVIDER = os.getenv("RADAR_PROVIDER", "anthropic").lower()
+
+# Anthropic model (used when PROVIDER=anthropic). Quality is the whole point, so
+# default to the most capable Claude model.
 MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8")
+
+# OpenAI model + key (used when RADAR_PROVIDER=openai).
+OPENAI_MODEL = os.getenv("RADAR_OPENAI_MODEL", "gpt-4o")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # --- Sources -------------------------------------------------------------
 # How many items to pull from each source (HN, Lobsters, Dev.to, GitHub).
@@ -83,3 +91,11 @@ BRIEFS_DIR = ROOT / "briefs"
 
 # A descriptive User-Agent keeps the source APIs happy on unauthenticated reads.
 USER_AGENT = "problembrief/0.1 (personal research tool)"
+
+# --- Email delivery via Resend (optional) --------------------------------
+# If RESEND_API_KEY is set, the brief is emailed after each run; otherwise skipped.
+# The free tier needs no domain: send from the shared onboarding sender to your own
+# Resend signup address. See README "Email setup".
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "Problembrief <onboarding@resend.dev>")
+EMAIL_TO = os.getenv("EMAIL_TO", "")  # your Resend account email (required to send)
