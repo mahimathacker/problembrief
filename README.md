@@ -30,8 +30,10 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
   a skimmable Markdown brief from the top opportunities.
 - **save_results** — writes `briefs/YYYY-MM-DD.md`.
 
-Extraction/scoring quality is the whole point, so it runs on **Claude Opus 4.8** with
-structured outputs.
+Extraction/scoring quality is the whole point, so it defaults to **Claude Opus 4.8**
+with structured outputs. To switch backends when you're low on credits, set
+`RADAR_PROVIDER=openai` and `OPENAI_API_KEY` (optionally `RADAR_OPENAI_MODEL`, default
+`gpt-4o`) — the pipeline is provider-agnostic.
 
 ## Setup
 

@@ -33,7 +33,8 @@ def generate_daily_brief(state: RadarState) -> RadarState:
     print(f"[4/5] writing brief from {len(opps)} opportunities…")
     today = date.today().isoformat()
     id_to_url = {it.id: it.url for it in raw}
-    brief = llm.write_brief(opps, today, len(raw), id_to_url)
+    id_to_source = {it.id: it.source for it in raw}
+    brief = llm.write_brief(opps, today, len(raw), id_to_url, id_to_source)
     return {"brief_markdown": brief}
 
 

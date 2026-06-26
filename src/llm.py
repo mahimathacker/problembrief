@@ -105,7 +105,17 @@ signal real, shared pain.
 What to extract:
 - Be SELECTIVE. Quality over coverage: return at most the 3-4 strongest pain points \
 per batch, or zero if there's no real signal. A vague theme is worse than nothing.
+- Favor REAL, GENUINE problems whose solution would meaningfully help people — \
+developers OR everyday/non-technical users. Real impact on real people matters more \
+than novelty or cleverness.
 - Prefer specific problems ("X has no good way to do Y") over broad topics ("AI is hard").
+- The goal is a BUILDABLE IDEA — a real problem you could turn into a startup, a demo, \
+or a genuinely better tool/app that helps developers OR everyday people. Judge each by: \
+is it real, is it actually felt, and could a small team ship something people would use \
+(and ideally pay for)?
+- SKIP nice-to-haves and saturated categories (yet-another note-taking / journaling / \
+to-do / blogging app, personal-productivity fluff) unless the discussion shows people \
+actually paying or switching.
 - `evidence` must be a real quote or close paraphrase from the post/comments.
 - Each pain point must cite the source id(s) it came from.
 - category must be exactly one of: {_CATS}.
@@ -141,8 +151,13 @@ into a focused set of opportunities.
 
 Rules:
 - Merge duplicates and near-duplicates into one opportunity; combine their source_ids.
-- DROP anything vague, one-off, or not genuinely buildable — a short sharp list beats a \
-long mushy one.
+- Rank by genuine pain × how underserved it is × willingness-to-pay. Keep only ideas \
+worth building into a startup, demo, or better tool/app for developers or everyday people.
+- DROP anything vague, saturated, or not genuinely buildable. A pain point from a single \
+uncorroborated source is watchlist material at best — do NOT promote it to a top \
+opportunity or give it a high frequency score.
+- Be ruthless: returning only 2-3 strong, buildable ideas (or fewer) on a thin day is \
+correct. Never pad the list to hit a number.
 - When merging, set frequency to reflect how many distinct posts/comments mention it; \
 take the strongest pain/market_signal among merged items; keep buildability and \
 personal_interest as your best estimate.
@@ -177,28 +192,38 @@ _BRIEF_SYS = """You write a sharp daily 'builder brief' for a founder/engineer w
 studies developer problems every morning. Tone: direct, opinionated, concrete. \
 No fluff, no hype. Use Markdown."""
 
+# Human-readable site label per source, so links aren't mislabeled by the model.
+_SITE = {
+    "hackernews": "Hacker News",
+    "lobsters": "Lobsters",
+    "devto": "Dev.to",
+    "github": "GitHub",
+}
+
 
 def write_brief(
     opps: list[Opportunity],
     date_str: str,
     item_count: int,
     id_to_url: dict[str, str] | None = None,
+    id_to_source: dict[str, str] | None = None,
 ) -> str:
     id_to_url = id_to_url or {}
+    id_to_source = id_to_source or {}
     top = opps[: config.TOP_N]
 
-    # Resolve each opportunity's source_ids to real URLs so the model can cite them
-    # verbatim instead of inventing links.
+    # Resolve each opportunity's source_ids to {site, url} so the model cites links
+    # verbatim with the correct site label instead of guessing either.
     payload_objs = []
     for o in top:
         d = o.model_dump()
-        urls, seen = [], set()
+        srcs, seen = [], set()
         for sid in d.get("source_ids", []):
             u = id_to_url.get(sid)
             if u and u not in seen:
                 seen.add(u)
-                urls.append(u)
-        d["sources"] = urls[:5]
+                srcs.append({"site": _SITE.get(id_to_source.get(sid, ""), "source"), "url": u})
+        d["sources"] = srcs[:5]
         payload_objs.append(d)
     payload = json.dumps(payload_objs, indent=2)
 
@@ -211,10 +236,13 @@ opportunities (already scored, sorted by composite):
 Write the brief with:
 1. A 2-3 sentence '## TL;DR' of the day's strongest signal.
 2. '## Opportunities' — one '### ' entry per opportunity with: the problem, why now, \
-who'd pay, a buildability read, the score line `pain/freq/build/market/interest`, and \
-finally a `**Sources:** ` line of Markdown links built ONLY from that opportunity's \
-`sources` URLs, each labeled by its site (GitHub / Hacker News / Lobsters / Dev.to). \
-Copy URLs verbatim — never invent one; omit the line if `sources` is empty.
+who'd pay, and a one-line buildability read. Then end the entry with these two lines, \
+formatted EXACTLY like this (substitute each integer, keep the word labels):
+   `**Score:** pain {pain} · freq {frequency} · build {buildability} · market {market_signal} · interest {personal_interest}`
+   `**Sources:** ` followed by Markdown links built ONLY from that opportunity's \
+`sources` — use each entry's `site` as the link text and its `url` as the link target, \
+copied verbatim. Never invent a URL; omit the Sources line if `sources` is empty.
 3. '## Watchlist' — one line on weaker-but-interesting threads, if any.
-Keep it skimmable."""
+Keep it skimmable. If only a couple of opportunities are genuinely strong, include only \
+those and note in the TL;DR that the signal was thin today — never pad to fill space."""
     return _complete(_BRIEF_SYS, user, 8000)
