@@ -18,17 +18,21 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
 
 - **fetch_sources** — Hacker News (Algolia), Lobsters (`hottest.json`), Dev.to
   (`/api/articles`), and GitHub Issues (Search API, querying feature-requests and
-  "is there a way to…" issues by reactions) — all no-auth and on by default. The
-  busiest HN + GitHub threads are enriched with their **top comments**, where the real
-  pain shows. A free `GITHUB_TOKEN` just raises GitHub's rate limit. One failing source
-  won't kill the run.
+  "is there a way to…" issues created in the last ~30 days, by reactions) — all no-auth
+  and on by default. The busiest HN + GitHub threads are enriched with their **top
+  comments**, where the real pain shows. Then a **cross-run dedup** drops anything
+  already surfaced in a brief within the last `RADAR_DEDUP_DAYS` (default 7) — so the
+  same problems don't repeat day after day. A free `GITHUB_TOKEN` just raises GitHub's
+  rate limit. One failing source won't kill the run.
 - **extract_pain_points** — Claude reads each batch and pulls concrete, buildable
   problems, each tagged with a category and 1–5 scores (pain, frequency,
   buildability, market signal, personal interest), citing its source posts.
 - **dedupe_similar** — Claude merges near-duplicates into single opportunities.
 - **generate_daily_brief** — a composite score is computed in code, and Claude writes
   a skimmable Markdown brief from the top opportunities.
-- **save_results** — writes `briefs/YYYY-MM-DD.md`.
+- **save_results** — writes `briefs/YYYY-MM-DD.md` and records the surfaced
+  opportunities' source URLs to `state/seen.json` (the dedup store). On the daily cron,
+  both are committed back to the repo — a lightweight, service-free "database".
 
 Extraction/scoring quality is the whole point, so it defaults to **Claude Opus 4.8**
 with structured outputs. To switch backends when you're low on credits, set
@@ -58,6 +62,8 @@ Everything tunable lives in `config.py` (override via `.env`):
 - `RADAR_INTERESTS` — biases the `personal_interest` score and the brief's framing
 - `RADAR_MAX_PER_SOURCE` — posts pulled per source
 - `RADAR_GITHUB_QUERIES` — what GitHub issue searches to run (semicolon-separated)
+- `RADAR_GITHUB_RECENCY_DAYS` — only pull GitHub issues created in the last N days (default 30)
+- `RADAR_DEDUP_DAYS` — don't resurface a problem within N days (default 7)
 - `RADAR_TOP_N` — opportunities included in the brief
 - `WEIGHTS` — composite-score weighting (edit in `config.py`)
 

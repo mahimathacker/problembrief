@@ -47,6 +47,10 @@ GITHUB_QUERIES = [
     if q.strip()
 ]
 
+# Only pull GitHub issues created within this many days, so the search surfaces
+# fresh pain instead of the same all-time-most-reacted issues every day.
+GITHUB_RECENCY_DAYS = int(os.getenv("RADAR_GITHUB_RECENCY_DAYS", "30"))
+
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
 INTERESTS = [
@@ -88,6 +92,15 @@ TOP_N = int(os.getenv("RADAR_TOP_N", "8"))
 # --- Output --------------------------------------------------------------
 ROOT = Path(__file__).parent
 BRIEFS_DIR = ROOT / "briefs"
+
+# --- Persistence / cross-run dedup ---------------------------------------
+STATE_DIR = ROOT / "state"
+SEEN_PATH = STATE_DIR / "seen.json"
+# Skip source items already surfaced in a brief within this many days — this is
+# what stops the same problems from repeating day after day.
+DEDUP_DAYS = int(os.getenv("RADAR_DEDUP_DAYS", "7"))
+# Forget seen URLs older than this, so seen.json doesn't grow forever.
+SEEN_RETENTION_DAYS = int(os.getenv("RADAR_SEEN_RETENTION_DAYS", "60"))
 
 # A descriptive User-Agent keeps the source APIs happy on unauthenticated reads.
 USER_AGENT = "problembrief/0.1 (personal research tool)"

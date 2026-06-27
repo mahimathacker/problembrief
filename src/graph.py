@@ -6,13 +6,15 @@ from datetime import date
 from langgraph.graph import END, StateGraph
 
 import config
-from src import llm, sources
+from src import llm, sources, store
 from src.schema import RadarState
 
 
 def fetch_sources(state: RadarState) -> RadarState:
     print("[1/5] fetching sources…")
-    return {"raw_items": sources.fetch_all()}
+    items = sources.fetch_all()
+    items = store.filter_unseen(items, config.DEDUP_DAYS)
+    return {"raw_items": items}
 
 
 def extract_pain_points(state: RadarState) -> RadarState:
@@ -43,6 +45,13 @@ def save_results(state: RadarState) -> RadarState:
     config.BRIEFS_DIR.mkdir(exist_ok=True)
     path = config.BRIEFS_DIR / f"{date.today().isoformat()}.md"
     path.write_text(state.get("brief_markdown", ""), encoding="utf-8")
+
+    # Remember what we surfaced today so it won't repeat for DEDUP_DAYS.
+    raw = state.get("raw_items", [])
+    id_to_url = {it.id: it.url for it in raw}
+    surfaced = state.get("deduped", [])[: config.TOP_N]
+    store.record(surfaced, id_to_url, config.SEEN_RETENTION_DAYS)
+
     return {"brief_path": str(path)}
 
 

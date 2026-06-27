@@ -9,6 +9,7 @@ Sources (all no-auth, on by default):
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 
 import httpx
 
@@ -174,15 +175,20 @@ def fetch_github(queries: list[str], limit: int, token: str = "") -> list[Source
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
+    # Recency window: surface issues created recently, not the all-time most-reacted
+    # ones (which would repeat every day). Skipped if a query sets its own created:.
+    cutoff = (date.today() - timedelta(days=config.GITHUB_RECENCY_DAYS)).isoformat()
+
     items: list[SourceItem] = []
     rows = []  # (item, comments_url, num_comments) for comment enrichment
     seen: set[str] = set()
     with httpx.Client(timeout=20, headers=headers) as c:
         for qi, q in enumerate(queries):
+            q_full = q if "created:" in q else f"{q} created:>{cutoff}"
             try:
                 r = c.get(
                     "https://api.github.com/search/issues",
-                    params={"q": q, "sort": "reactions", "order": "desc", "per_page": limit},
+                    params={"q": q_full, "sort": "reactions", "order": "desc", "per_page": limit},
                 )
                 r.raise_for_status()
                 hits = r.json().get("items", [])

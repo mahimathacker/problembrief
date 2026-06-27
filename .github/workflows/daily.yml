@@ -9,6 +9,8 @@ on:
 jobs:
   brief:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # allow committing the brief + dedup state back to the repo
     steps:
       - uses: actions/checkout@v4
 
@@ -31,3 +33,15 @@ jobs:
           # Built-in token raises the GitHub Issues search rate limit, for free.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python -m src.main
+
+      - name: Commit brief + dedup state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add briefs state
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Daily brief $(date -u +%F)"
+            git push
+          fi
