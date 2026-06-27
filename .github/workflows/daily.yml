@@ -21,7 +21,12 @@ jobs:
 
       - name: Run Problembrief
         env:
+          # Provider switch: defaults to anthropic. To run the cron on OpenAI instead,
+          # add a repo *variable* RADAR_PROVIDER=openai (Settings → Secrets and
+          # variables → Actions → Variables tab) plus an OPENAI_API_KEY *secret*.
+          RADAR_PROVIDER: ${{ vars.RADAR_PROVIDER || 'anthropic' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           # Built-in token raises the GitHub Issues search rate limit, for free.
