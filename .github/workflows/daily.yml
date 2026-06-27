@@ -21,10 +21,9 @@ jobs:
 
       - name: Run Problembrief
         env:
-          # Provider switch: defaults to anthropic. To run the cron on OpenAI instead,
-          # add a repo *variable* RADAR_PROVIDER=openai (Settings → Secrets and
-          # variables → Actions → Variables tab) plus an OPENAI_API_KEY *secret*.
-          RADAR_PROVIDER: ${{ vars.RADAR_PROVIDER || 'anthropic' }}
+          # Hardcoded to OpenAI (out of Claude credit). To switch back to Claude,
+          # change this line to `RADAR_PROVIDER: anthropic`.
+          RADAR_PROVIDER: openai
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
