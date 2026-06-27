@@ -236,7 +236,9 @@ opportunities (already scored, sorted by composite):
 Write the brief with:
 1. A 2-3 sentence '## TL;DR' of the day's strongest signal.
 2. '## Opportunities' — one '### ' entry per opportunity with: the problem, why now, \
-who'd pay, and a one-line buildability read. Then end the entry with these two lines. \
+who'd pay, a one-line buildability read, and a `**The build:**` line naming the single \
+concrete thing to ship first (the MVP wedge — what's actually possible to build next). \
+Then end the entry with these two lines. \
 The score line must look EXACTLY like this example — same word labels and '·' separators, \
 but substitute the opportunity's real integers for pain / frequency / buildability / \
 market_signal / personal_interest:

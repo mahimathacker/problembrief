@@ -16,14 +16,17 @@ from there.
 fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brief → save_results
 ```
 
-- **fetch_sources** — Hacker News (Algolia), Lobsters (`hottest.json`), Dev.to
-  (`/api/articles`), and GitHub Issues (Search API, querying feature-requests and
-  "is there a way to…" issues created in the last ~30 days, by reactions) — all no-auth
-  and on by default. The busiest HN + GitHub threads are enriched with their **top
-  comments**, where the real pain shows. Then a **cross-run dedup** drops anything
-  already surfaced in a brief within the last `RADAR_DEDUP_DAYS` (default 7) — so the
-  same problems don't repeat day after day. A free `GITHUB_TOKEN` just raises GitHub's
-  rate limit. One failing source won't kill the run.
+- **fetch_sources** — all no-auth and on by default:
+  - **Hacker News** — searched for recent pain/complaint phrases ("is there a way to…",
+    "alternative to…", "frustrated with…"), not the front page, so it surfaces real
+    gripes about *existing products*, not launch headlines.
+  - **Lobsters** (`hottest.json`) and **Dev.to** (`/api/articles`).
+  - **GitHub Issues** (Search API) — recent issues (last ~30 days) matching pain queries.
+  - The HN phrases and GitHub queries are **rotated daily** from a larger pool, so the
+    brief stops circling the same topics. The busiest HN + GitHub threads are enriched
+    with their **top comments**, where the real pain shows. A **cross-run dedup** then
+    drops anything already surfaced within `RADAR_DEDUP_DAYS` (default 7). A free
+    `GITHUB_TOKEN` just raises GitHub's rate limit; one failing source won't kill the run.
 - **extract_pain_points** — Claude reads each batch and pulls concrete, buildable
   problems, each tagged with a category and 1–5 scores (pain, frequency,
   buildability, market signal, personal interest), citing its source posts.

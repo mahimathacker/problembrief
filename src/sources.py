@@ -9,7 +9,7 @@ Sources (all no-auth, on by default):
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
 
@@ -17,6 +17,16 @@ import config
 from src.schema import SourceItem
 
 _TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _daily_rotation(pool: list[str], k: int) -> list[str]:
+    """Pick k items from the pool, rotating the start by the date — so a different
+    subset runs each day and the brief stops circling the same topics."""
+    n = len(pool)
+    if n <= k:
+        return pool
+    start = date.today().toordinal() % n
+    return [pool[(start + i) % n] for i in range(k)]
 
 
 def _clean(text: str | None, limit: int = 1200) -> str:
@@ -67,32 +77,56 @@ def _gh_comments(comments_url: str, client: httpx.Client, n: int) -> list[str]:
 # --- Hacker News ---------------------------------------------------------
 
 def fetch_hackernews(limit: int) -> list[SourceItem]:
-    """HN front-page stories (Algolia API), enriched with top comments."""
-    with httpx.Client(timeout=20, headers={"User-Agent": config.USER_AGENT}) as c:
-        r = c.get(
-            "https://hn.algolia.com/api/v1/search",
-            params={"tags": "front_page", "hitsPerPage": limit},
-        )
-        r.raise_for_status()
-        hits = r.json().get("hits", [])
+    """HN searched for recent pain/complaint phrases (not the front page), so it
+    surfaces real gripes and 'is there a better X' asks. Enriched with top comments."""
+    phrases = _daily_rotation(config.HN_PAIN_PHRASES, config.HN_PHRASES_PER_DAY)
+    cutoff_ts = int(
+        (datetime.now(timezone.utc) - timedelta(days=config.HN_RECENCY_DAYS)).timestamp()
+    )
+    per_phrase = max(5, limit // max(1, len(phrases)) + 2)
 
-        items: list[SourceItem] = []
-        rows = []  # (item, object_id, num_comments) for comment enrichment
-        for i, h in enumerate(hits):
-            title = h.get("title") or h.get("story_title") or ""
-            if not title:
+    items: list[SourceItem] = []
+    rows = []  # (item, object_id, num_comments) for comment enrichment
+    seen_ids: set[str] = set()
+    with httpx.Client(timeout=20, headers={"User-Agent": config.USER_AGENT}) as c:
+        for phrase in phrases:
+            try:
+                r = c.get(
+                    "https://hn.algolia.com/api/v1/search",
+                    params={
+                        "query": phrase,
+                        "tags": "story",
+                        "numericFilters": f"created_at_i>{cutoff_ts}",
+                        "hitsPerPage": per_phrase,
+                    },
+                )
+                r.raise_for_status()
+                hits = r.json().get("hits", [])
+            except Exception as e:
+                print(f"  ! hn search '{phrase}' skipped: {e}")
                 continue
-            item = SourceItem(
-                id=f"hn-{i}",
-                source="hackernews",
-                title=title,
-                text=_clean(h.get("story_text") or h.get("comment_text")),
-                url=h.get("url") or f"https://news.ycombinator.com/item?id={h.get('objectID')}",
-                points=int(h.get("points") or 0),
-                num_comments=int(h.get("num_comments") or 0),
-            )
-            items.append(item)
-            rows.append((item, str(h.get("objectID")), item.num_comments))
+
+            for h in hits:
+                oid = str(h.get("objectID"))
+                title = h.get("title") or h.get("story_title") or ""
+                if not title or oid in seen_ids:
+                    continue
+                seen_ids.add(oid)
+                item = SourceItem(
+                    id=f"hn-{len(items)}",
+                    source="hackernews",
+                    title=title,
+                    text=_clean(h.get("story_text") or h.get("comment_text")),
+                    url=h.get("url") or f"https://news.ycombinator.com/item?id={oid}",
+                    points=int(h.get("points") or 0),
+                    num_comments=int(h.get("num_comments") or 0),
+                )
+                items.append(item)
+                rows.append((item, oid, item.num_comments))
+                if len(items) >= limit:
+                    break
+            if len(items) >= limit:
+                break
 
         if config.FETCH_COMMENTS:
             for item, oid, _ in sorted(rows, key=lambda x: x[2], reverse=True)[
@@ -235,7 +269,11 @@ def fetch_all() -> list[SourceItem]:
         ("hackernews", lambda: fetch_hackernews(config.MAX_PER_SOURCE)),
         ("lobsters", lambda: fetch_lobsters(config.MAX_PER_SOURCE)),
         ("devto", lambda: fetch_devto(config.MAX_PER_SOURCE)),
-        ("github", lambda: fetch_github(config.GITHUB_QUERIES, config.MAX_PER_SOURCE, config.GITHUB_TOKEN)),
+        ("github", lambda: fetch_github(
+            _daily_rotation(config.GITHUB_QUERIES, config.GITHUB_QUERIES_PER_DAY),
+            config.MAX_PER_SOURCE,
+            config.GITHUB_TOKEN,
+        )),
     ):
         try:
             got = fn()

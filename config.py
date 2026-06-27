@@ -35,21 +35,60 @@ COMMENTS_PER_THREAD = int(os.getenv("RADAR_COMMENTS_PER_THREAD", "6"))
 # limit (10 -> 30 search req/min) and avoids 403s. Optional.
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
-# Pain-signal queries for the GitHub issue search (one source item per result).
-# Override with RADAR_GITHUB_QUERIES (semicolon-separated).
+# Pool of pain-signal queries for the GitHub issue search. A rotating subset runs
+# each day (see GITHUB_QUERIES_PER_DAY) so the brief doesn't keep pulling the same
+# cluster. Override the whole pool with RADAR_GITHUB_QUERIES (semicolon-separated).
 GITHUB_QUERIES = [
     q.strip()
     for q in os.getenv(
         "RADAR_GITHUB_QUERIES",
-        '"feature request" in:title type:issue state:open comments:>3'
-        ';"is there a way to" in:title type:issue state:open comments:>2',
+        ";".join(
+            [
+                '"feature request" in:title type:issue state:open comments:>3',
+                '"is there a way to" in:title type:issue state:open comments:>2',
+                '"would be great if" in:title type:issue state:open comments:>2',
+                '"any plans to" in:title type:issue state:open comments:>2',
+                '"alternative to" in:title type:issue state:open comments:>2',
+                '"frustrating" in:body type:issue state:open comments:>3',
+                '"workaround for" in:title type:issue state:open comments:>3',
+                '"no good way to" in:body type:issue state:open comments:>2',
+            ]
+        ),
     ).split(";")
     if q.strip()
 ]
+# How many of the pool's queries to run per day (rotated by date).
+GITHUB_QUERIES_PER_DAY = int(os.getenv("RADAR_GITHUB_QUERIES_PER_DAY", "3"))
 
 # Only pull GitHub issues created within this many days, so the search surfaces
 # fresh pain instead of the same all-time-most-reacted issues every day.
 GITHUB_RECENCY_DAYS = int(os.getenv("RADAR_GITHUB_RECENCY_DAYS", "30"))
+
+# Hacker News is searched for pain/complaint phrases (Ask HN, "is there a way to…",
+# "alternative to…") instead of the front page — this surfaces real problems and
+# gripes about *existing launched products*, not launch/news headlines. A rotating
+# subset of phrases runs each day.
+HN_PAIN_PHRASES = [
+    p.strip()
+    for p in os.getenv(
+        "RADAR_HN_PHRASES",
+        ";".join(
+            [
+                "is there a way to",
+                "is there a better",
+                "alternative to",
+                "I wish there was",
+                "frustrated with",
+                "anyone know a tool",
+                "why is there no",
+                "does anyone have a good",
+            ]
+        ),
+    ).split(";")
+    if p.strip()
+]
+HN_PHRASES_PER_DAY = int(os.getenv("RADAR_HN_PHRASES_PER_DAY", "4"))
+HN_RECENCY_DAYS = int(os.getenv("RADAR_HN_RECENCY_DAYS", "21"))
 
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
