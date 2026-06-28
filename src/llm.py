@@ -329,6 +329,7 @@ Write the buildability thesis."""
     thesis = _parse(_THESIS_SYS, user, MarketThesis, 4000)
     if thesis:
         thesis.source_ids = lead.source_ids
+        thesis.category = lead.category
     return thesis
 
 
@@ -390,6 +391,8 @@ Write the brief in Markdown:
 1. '## TL;DR' — 2-3 sentences on the strongest buildable idea today and why. If there are \
 zero theses, say the day was thin and stop.
 2. '## Buildable Ideas' — one '### <title>' entry per thesis, in this exact line order:
+   `**Category:**` the `category` value written nicely — replace underscores with a space \
+and capitalize (e.g. "small_business" → "Small business", "ai_agents" → "AI agents").
    `**Problem:**` the pain in one simple line.
    `**What's already out there:**` the real tools + their prices from `what_exists` \
 (write "No clear competitor yet" if empty). Many tools already there is a GOOD sign — \

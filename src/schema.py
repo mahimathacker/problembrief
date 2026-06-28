@@ -64,6 +64,7 @@ class MarketThesis(BaseModel):
     """A grounded buildability thesis for one lead, written after live web research."""
 
     title: str = Field(description="Short, concrete name for the opportunity.")
+    category: str = Field(default="", description="Category tag (set from the lead).")
     problem: str = Field(description="The pain, in one or two plain sentences.")
     what_exists: list[str] = Field(
         description="Existing tools/competitors with pricing where known; empty if greenfield."
