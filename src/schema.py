@@ -48,6 +48,18 @@ class Deduped(BaseModel):
     opportunities: list[Opportunity]
 
 
+class OpportunityDecision(BaseModel):
+    """A critic pass decision for one deduped opportunity."""
+
+    index: int = Field(description="Zero-based index of the opportunity being reviewed.")
+    keep: bool = Field(description="True only if this is brief-worthy.")
+    reason: str = Field(description="Short reason for keep/reject.")
+
+
+class OpportunityReview(BaseModel):
+    decisions: list[OpportunityDecision]
+
+
 class RadarState(TypedDict, total=False):
     raw_items: list[SourceItem]
     pain_points: list[PainPoint]

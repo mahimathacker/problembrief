@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 
 import config
-from src.schema import Deduped, Extraction, Opportunity, PainPoint, SourceItem
+from src.schema import Deduped, Extraction, Opportunity, OpportunityReview, PainPoint, SourceItem
 
 _CATS = ", ".join(config.CATEGORIES)
 _INTERESTS = ", ".join(config.INTERESTS)
@@ -116,6 +116,13 @@ product, business, or widely adopted workflow.
 - Reject "just a feature" ideas: one app/library missing a setting, a small UX fix, \
 a how-to guide, a curated list, a compatibility tweak, a wrapper around one API, or \
 generic automation with no clear buyer.
+- Reject self-improvement/content-marketing posts: career advice, learning journeys, \
+"I wish I documented more", tool overload, productivity anxiety, personal workflow \
+regret, or generic documentation habits are not product opportunities unless there is \
+explicit team budget or compliance/revenue risk.
+- Reject vendor/platform complaints when the obvious solution belongs to the vendor \
+itself. Only extract them when an independent third-party wedge is clearly useful and \
+buyers already spend money to manage that risk.
 - Reject weak market logic: if the only buyer is a vague group like "developers", \
 "SaaS companies", "platforms", or "enterprises" without evidence of budget, adoption, \
 switching, compliance pressure, revenue loss, or repeated workaround pain, do not extract it.
@@ -163,6 +170,13 @@ that could become a strong product opportunity, not merely a feature request or 
 - DROP anything vague, saturated, low-stakes, generic, or mostly solved by a small \
 setting/plugin/script/guide/list. Also drop repo-specific feature requests unless they \
 reveal a broader repeated workflow pain with a clear buyer.
+- DROP self-improvement, personal productivity, documentation journey, tool overload, \
+and "centralized hub" ideas unless the evidence shows urgent team-level budget, \
+compliance risk, or revenue loss.
+- DROP vendor-specific bugs, deprecations, rate limits, outages, and missing features \
+when the best answer is "the vendor should fix it." Do not convert those into generic \
+monitoring dashboards, patched forks, or alerting tools unless the evidence proves \
+people already pay for that workaround.
 - A single-source pain point can survive only if the pain is acute AND market_signal is \
 strong. Otherwise treat it as anecdote, not an opportunity.
 - AIM for the ~3-5 strongest DISTINCT opportunities. Return fewer, even zero, when the \
@@ -175,6 +189,30 @@ personal_interest as your best estimate.
 - Do not invent new pain points; only consolidate what's given."""
 
 
+_VERIFY_SYS = """You are the skeptical final quality gate for a daily problem brief.
+
+Your job is NOT to find a way to make each idea work. Your job is to reject weak ideas.
+Default to keep=false unless the evidence clearly supports a real opportunity.
+
+Keep an opportunity only if ALL of these are true:
+1. The pain is external and concrete, not a personal reflection, tutorial, content post,
+   career advice, vague productivity anxiety, or "too many tools" feeling.
+2. The affected user has an urgent or recurring workflow/business problem, not a mild
+   annoyance, one-off bug, deprecation warning, or missing setting.
+3. The buyer/adopter is specific and believable from the evidence. Generic buyers like
+   "developers", "teams", "SaaS companies", "enterprises", or "platforms" are not enough.
+4. The first product wedge is independently valuable. Reject if the best solution is
+   "the vendor should fix it", a patched fork, generic monitoring dashboard, centralized
+   hub, curated list, guide, wrapper, plugin, or simple automation.
+5. Market signal is proven by the evidence: budget, paid workaround, switching intent,
+   compliance/revenue risk, strong adoption pressure, or repeated workaround pain.
+6. The opportunity could plausibly become a durable product or business, not merely a
+   nice feature, internal script, or small open-source contribution.
+
+Scoring from the previous model is untrusted. Re-score mentally from the evidence and
+reject anything that was inflated. Return one decision for every input index."""
+
+
 def _composite(obj) -> float:
     """Weighted sum of the five 1-5 sub-scores (works on PainPoint or Opportunity)."""
     return round(sum(getattr(obj, k) * w for k, w in config.WEIGHTS.items()), 3)
@@ -183,6 +221,14 @@ def _composite(obj) -> float:
 _WEAK_OPPORTUNITY_TERMS = (
     "auto-save",
     "autosave",
+    "centralized hub",
+    "decision paralysis",
+    "documentation journey",
+    "documentation tools",
+    "self-improvement",
+    "tool overload",
+    "overwhelming variety",
+    "productivity anxiety",
     "browser plugin",
     "browser extension",
     "chrome extension",
@@ -196,14 +242,21 @@ _WEAK_OPPORTUNITY_TERMS = (
     "wrapper",
     "missing field",
     "abortearly",
+    "node.js 20 deprecation",
+    "deprecation warning",
+    "patched action",
+    "rate limiting",
+    "rate limits",
+    "monitoring tool",
+    "usage analytics",
 )
 
 
 def _passes_opportunity_bar(o: Opportunity) -> bool:
     """Deterministic guardrail against polished but weak product ideas."""
-    if o.pain < 4 or o.market_signal < 3:
+    if o.pain < 4 or o.market_signal < 4:
         return False
-    if o.frequency < 3 and o.market_signal < 5:
+    if o.frequency < 4 and o.market_signal < 5:
         return False
     if o.buildability < 2:
         return False
@@ -215,7 +268,65 @@ def _passes_opportunity_bar(o: Opportunity) -> bool:
     return True
 
 
-def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
+def _verify_opportunities(
+    opps: list[Opportunity], source_items: list[SourceItem] | None = None
+) -> list[Opportunity]:
+    if not opps:
+        return []
+
+    source_lookup = {it.id: it for it in source_items or []}
+    payload = json.dumps(
+        [
+            {
+                "index": i,
+                "summary": o.summary,
+                "category": o.category,
+                "evidence": o.evidence,
+                "source_ids": o.source_ids,
+                "pain": o.pain,
+                "frequency": o.frequency,
+                "buildability": o.buildability,
+                "market_signal": o.market_signal,
+                "personal_interest": o.personal_interest,
+                "composite": o.composite,
+                "source_context": [
+                    {
+                        "id": sid,
+                        "source": source_lookup[sid].source,
+                        "title": source_lookup[sid].title,
+                        "text": source_lookup[sid].text[:1200],
+                    }
+                    for sid in o.source_ids
+                    if sid in source_lookup
+                ],
+            }
+            for i, o in enumerate(opps)
+        ],
+        indent=2,
+    )
+    parsed = _parse(
+        _VERIFY_SYS,
+        "Review these candidate opportunities against their source_context. Return "
+        "keep=false for weak, inflated, or unsupported ideas. If source_context is "
+        "available, trust it more than the summary/evidence fields:\n\n"
+        f"{payload}",
+        OpportunityReview,
+        8000,
+    )
+    if not parsed:
+        return []
+
+    keep_indexes = {
+        d.index
+        for d in parsed.decisions
+        if d.keep and 0 <= d.index < len(opps)
+    }
+    return [o for i, o in enumerate(opps) if i in keep_indexes]
+
+
+def dedupe(
+    pain_points: list[PainPoint], source_items: list[SourceItem] | None = None
+) -> list[Opportunity]:
     if not pain_points:
         return []
     # Pre-rank by composite and cap, so the model's output stays within budget and
@@ -227,6 +338,7 @@ def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
     for o in opps:
         o.composite = _composite(o)
     opps = [o for o in opps if _passes_opportunity_bar(o)]
+    opps = _verify_opportunities(opps, source_items)
     opps.sort(key=lambda o: o.composite, reverse=True)
     return opps
 

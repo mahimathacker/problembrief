@@ -37,6 +37,31 @@ def _clean(text: str | None, limit: int = 1200) -> str:
     return text[:limit]
 
 
+_PAIN_SIGNAL_RE = re.compile(
+    r"\b("
+    r"alternative|blocked|bottleneck|broken|can't|cannot|complex|confusing|"
+    r"difficult|friction|frustrat(?:e|ed|ing)|hard|missing|pain|problem|"
+    r"slow|struggle|workaround|waste|wish"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_LOW_SIGNAL_RE = re.compile(
+    r"\b("
+    r"career|documenting my|journey|learned|motivation|productivity|"
+    r"self[- ]improvement|should have started|tutorial"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_pain_article(title: str, description: str) -> bool:
+    text = f"{title} {description}"
+    if _LOW_SIGNAL_RE.search(text):
+        return False
+    return bool(_PAIN_SIGNAL_RE.search(text))
+
+
 def _append_comments(item: SourceItem, comments: list[str]) -> None:
     """Fold a thread's top comments into the item's text (capped to bound tokens)."""
     if comments:
@@ -168,28 +193,33 @@ def fetch_lobsters(limit: int) -> list[SourceItem]:
 # --- Dev.to --------------------------------------------------------------
 
 def fetch_devto(limit: int) -> list[SourceItem]:
-    """Top dev.to articles from the last week (open API, no auth)."""
+    """Top dev.to articles from the last week, filtered for explicit pain signals."""
     with httpx.Client(timeout=20, headers={"User-Agent": config.USER_AGENT}) as c:
-        r = c.get("https://dev.to/api/articles", params={"top": 7, "per_page": limit})
+        r = c.get("https://dev.to/api/articles", params={"top": 7, "per_page": limit * 3})
         r.raise_for_status()
         articles = r.json()
 
     items: list[SourceItem] = []
     for i, a in enumerate(articles):
         title = a.get("title") or ""
+        description = _clean(a.get("description"))
         if not title:
+            continue
+        if not _looks_like_pain_article(title, description):
             continue
         items.append(
             SourceItem(
                 id=f"devto-{i}",
                 source="devto",
                 title=title,
-                text=_clean(a.get("description")),
+                text=description,
                 url=a.get("url") or "",
                 points=int(a.get("positive_reactions_count") or 0),
                 num_comments=int(a.get("comments_count") or 0),
             )
         )
+        if len(items) >= limit:
+            break
     return items
 
 

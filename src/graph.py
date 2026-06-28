@@ -25,8 +25,9 @@ def extract_pain_points(state: RadarState) -> RadarState:
 
 def dedupe_similar(state: RadarState) -> RadarState:
     pp = state.get("pain_points", [])
+    raw = state.get("raw_items", [])
     print(f"[3/5] deduping {len(pp)} pain points…")
-    return {"deduped": llm.dedupe(pp)}
+    return {"deduped": llm.dedupe(pp, raw)}
 
 
 def generate_daily_brief(state: RadarState) -> RadarState:
