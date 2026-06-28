@@ -41,6 +41,7 @@ def _parse(system: str, user: str, schema, max_tokens: int):
         completion = _openai().beta.chat.completions.parse(
             model=config.OPENAI_MODEL,
             max_completion_tokens=max_tokens,
+            temperature=0,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -51,6 +52,7 @@ def _parse(system: str, user: str, schema, max_tokens: int):
     resp = _anthropic().messages.parse(
         model=config.MODEL,
         max_tokens=max_tokens,
+        temperature=0,
         system=system,
         messages=[{"role": "user", "content": user}],
         output_format=schema,
@@ -64,6 +66,7 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
         completion = _openai().chat.completions.create(
             model=config.OPENAI_MODEL,
             max_completion_tokens=max_tokens,
+            temperature=0,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -73,6 +76,7 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
     msg = _anthropic().messages.create(
         model=config.MODEL,
         max_tokens=max_tokens,
+        temperature=0,
         thinking={"type": "adaptive"},
         system=system,
         messages=[{"role": "user", "content": user}],
@@ -268,6 +272,22 @@ def _passes_opportunity_bar(o: Opportunity) -> bool:
     return True
 
 
+def _bar_reject_reason(o: Opportunity) -> str:
+    if o.pain < 4:
+        return f"pain too low ({o.pain})"
+    if o.market_signal < 4:
+        return f"market signal too low ({o.market_signal})"
+    if o.frequency < 4 and o.market_signal < 5:
+        return f"frequency too low ({o.frequency}) without exceptional market signal"
+    if o.buildability < 2:
+        return f"buildability too low ({o.buildability})"
+
+    text = " ".join((o.summary, o.evidence, o.category)).lower()
+    if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
+        return "weak-opportunity pattern without exceptional evidence"
+    return "unknown"
+
+
 def _verify_opportunities(
     opps: list[Opportunity], source_items: list[SourceItem] | None = None
 ) -> list[Opportunity]:
@@ -316,6 +336,10 @@ def _verify_opportunities(
     if not parsed:
         return []
 
+    for d in parsed.decisions:
+        if not d.keep:
+            print(f"    verifier rejected #{d.index}: {d.reason}")
+
     keep_indexes = {
         d.index
         for d in parsed.decisions
@@ -337,8 +361,18 @@ def dedupe(
     opps = parsed.opportunities if parsed else []
     for o in opps:
         o.composite = _composite(o)
-    opps = [o for o in opps if _passes_opportunity_bar(o)]
-    opps = _verify_opportunities(opps, source_items)
+    print(f"  - dedupe produced {len(opps)} candidate opportunities")
+
+    gated = []
+    for o in opps:
+        if _passes_opportunity_bar(o):
+            gated.append(o)
+        else:
+            print(f"    score gate rejected: {o.summary} ({_bar_reject_reason(o)})")
+    print(f"  - score gate kept {len(gated)}/{len(opps)} candidates")
+
+    opps = _verify_opportunities(gated, source_items)
+    print(f"  - verifier kept {len(opps)}/{len(gated)} candidates")
     opps.sort(key=lambda o: o.composite, reverse=True)
     return opps
 
