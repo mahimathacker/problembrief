@@ -35,13 +35,20 @@ def _openai():
     return _openai_client
 
 
+def _openai_temperature_kwargs() -> dict:
+    """Some newer OpenAI models only accept the default temperature."""
+    if config.OPENAI_MODEL.startswith("gpt-5"):
+        return {}
+    return {"temperature": 0}
+
+
 def _parse(system: str, user: str, schema, max_tokens: int):
     """Structured output → a validated pydantic object (or None)."""
     if config.PROVIDER == "openai":
         completion = _openai().beta.chat.completions.parse(
             model=config.OPENAI_MODEL,
             max_completion_tokens=max_tokens,
-            temperature=0,
+            **_openai_temperature_kwargs(),
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -66,7 +73,7 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
         completion = _openai().chat.completions.create(
             model=config.OPENAI_MODEL,
             max_completion_tokens=max_tokens,
-            temperature=0,
+            **_openai_temperature_kwargs(),
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
