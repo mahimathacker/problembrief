@@ -90,6 +90,14 @@ HN_PAIN_PHRASES = [
 HN_PHRASES_PER_DAY = int(os.getenv("RADAR_HN_PHRASES_PER_DAY", "4"))
 HN_RECENCY_DAYS = int(os.getenv("RADAR_HN_RECENCY_DAYS", "21"))
 
+# --- Market enrichment (Tavily web search) -------------------------------
+# Each top lead is researched on the live web (existing tools, pricing, demand)
+# before the brief writes a grounded buildability thesis — turning a raw pain into
+# a product thesis. Without a key, enrichment is skipped and theses are ungrounded
+# (lower conviction). Free key: https://tavily.com
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "5"))
+
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
 INTERESTS = [

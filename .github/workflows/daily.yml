@@ -29,6 +29,8 @@ jobs:
           RADAR_OPENAI_MODEL: gpt-5.5
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Live market research for the buildability theses (free tier: tavily.com).
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           # Built-in token raises the GitHub Issues search rate limit, for free.

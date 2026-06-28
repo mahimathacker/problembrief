@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 
 import config
-from src.schema import Deduped, Extraction, Opportunity, OpportunityReview, PainPoint, SourceItem
+from src.schema import Deduped, Extraction, MarketThesis, Opportunity, PainPoint, SourceItem
 
 _CATS = ", ".join(config.CATEGORIES)
 _INTERESTS = ", ".join(config.INTERESTS)
@@ -200,28 +200,25 @@ personal_interest as your best estimate.
 - Do not invent new pain points; only consolidate what's given."""
 
 
-_VERIFY_SYS = """You are the skeptical final quality gate for a daily problem brief.
+_THESIS_SYS = """You are a pragmatic founder writing a grounded BUILDABILITY THESIS for \
+ONE problem, using live web-research context.
 
-Your job is NOT to find a way to make each idea work. Your job is to reject weak ideas.
-Default to keep=false unless the evidence clearly supports a real opportunity.
+Core principle — a crowded or proven market is a GREEN FLAG, not a reason to reject. If \
+many tools already exist and people pay (e.g. web-search APIs for AI agents like \
+Tavily/Exa/Serper), the demand is VALIDATED — your job is to name the WEDGE a new entrant \
+wins on (a sharper niche, better DX, a specific user, a missing integration), NOT to say \
+"already done". Genuinely empty markets where nobody pays are the real risk.
 
-Keep an opportunity only if ALL of these are true:
-1. The pain is external and concrete, not a personal reflection, tutorial, content post,
-   career advice, vague productivity anxiety, or "too many tools" feeling.
-2. The affected user has an urgent or recurring workflow/business problem, not a mild
-   annoyance, one-off bug, deprecation warning, or missing setting.
-3. The buyer/adopter is specific and believable from the evidence. Generic buyers like
-   "developers", "teams", "SaaS companies", "enterprises", or "platforms" are not enough.
-4. The first product wedge is independently valuable. Reject if the best solution is
-   "the vendor should fix it", a patched fork, generic monitoring dashboard, centralized
-   hub, curated list, guide, wrapper, plugin, or simple automation.
-5. Market signal is proven by the evidence: budget, paid workaround, switching intent,
-   compliance/revenue risk, strong adoption pressure, or repeated workaround pain.
-6. The opportunity could plausibly become a durable product or business, not merely a
-   nice feature, internal script, or small open-source contribution.
-
-Scoring from the previous model is untrusted. Re-score mentally from the evidence and
-reject anything that was inflated. Return one decision for every input index."""
+Rules:
+- Ground every claim in the provided web context. Do NOT invent competitors or pricing. \
+If the context is thin, say so and lower conviction — don't bluff.
+- Be honest about feature-vs-product: if the fix obviously belongs inside one existing \
+tool, set is_product=false and lower conviction.
+- conviction: high = real pain + a market where people clearly pay + a credible wedge; \
+medium = real pain but the wedge or demand is unproven; low = likely a feature, thin \
+demand, or no defensible angle.
+- biggest_risk must be the honest main reason this fails.
+Return a single thesis."""
 
 
 def _composite(obj) -> float:
@@ -263,155 +260,67 @@ _WEAK_OPPORTUNITY_TERMS = (
 )
 
 
-def _passes_opportunity_bar(o: Opportunity) -> bool:
-    """Deterministic guardrail against polished but weak product ideas."""
-    if o.pain < 4 or o.market_signal < 4:
+def _passes_lead_bar(o: Opportunity) -> bool:
+    """A real, concrete, buildable pain that isn't junk. Whether the MARKET is real is
+    decided later by live web enrichment — we don't demand proof of budget here (forums
+    rarely contain it), we just filter out fluff and tiny one-setting fixes."""
+    if o.pain < 4 or o.buildability < 3:
         return False
-    if o.frequency < 4 and o.market_signal < 5:
-        return False
-    if o.buildability < 2:
-        return False
-
-    text = " ".join((o.summary, o.evidence, o.category)).lower()
-    if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
-        # Allow small-sounding ideas only when the model found exceptional market pull.
-        return o.pain >= 5 and o.market_signal >= 5 and o.frequency >= 4
-    return True
-
-
-def _bar_reject_reason(o: Opportunity) -> str:
-    if o.pain < 4:
-        return f"pain too low ({o.pain})"
-    if o.market_signal < 4:
-        return f"market signal too low ({o.market_signal})"
-    if o.frequency < 4 and o.market_signal < 5:
-        return f"frequency too low ({o.frequency}) without exceptional market signal"
-    if o.buildability < 2:
-        return f"buildability too low ({o.buildability})"
-
-    text = " ".join((o.summary, o.evidence, o.category)).lower()
-    if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
-        return "weak-opportunity pattern without exceptional evidence"
-    return "unknown"
-
-
-def _passes_research_lead_bar(o: Opportunity) -> bool:
-    """Keep real-but-unproven pains visible without calling them opportunities."""
-    if o.pain < 4 or o.frequency < 3 or o.buildability < 3:
-        return False
-    if o.market_signal < 3:
-        return False
-
     text = " ".join((o.summary, o.evidence, o.category)).lower()
     if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
         return False
     return True
-
-
-def _verify_opportunities(
-    opps: list[Opportunity], source_items: list[SourceItem] | None = None
-) -> list[Opportunity]:
-    if not opps:
-        return []
-
-    source_lookup = {it.id: it for it in source_items or []}
-    payload = json.dumps(
-        [
-            {
-                "index": i,
-                "summary": o.summary,
-                "category": o.category,
-                "evidence": o.evidence,
-                "source_ids": o.source_ids,
-                "pain": o.pain,
-                "frequency": o.frequency,
-                "buildability": o.buildability,
-                "market_signal": o.market_signal,
-                "personal_interest": o.personal_interest,
-                "composite": o.composite,
-                "source_context": [
-                    {
-                        "id": sid,
-                        "source": source_lookup[sid].source,
-                        "title": source_lookup[sid].title,
-                        "text": source_lookup[sid].text[:1200],
-                    }
-                    for sid in o.source_ids
-                    if sid in source_lookup
-                ],
-            }
-            for i, o in enumerate(opps)
-        ],
-        indent=2,
-    )
-    parsed = _parse(
-        _VERIFY_SYS,
-        "Review these candidate opportunities against their source_context. Return "
-        "keep=false for weak, inflated, or unsupported ideas. If source_context is "
-        "available, trust it more than the summary/evidence fields:\n\n"
-        f"{payload}",
-        OpportunityReview,
-        8000,
-    )
-    if not parsed:
-        return []
-
-    for d in parsed.decisions:
-        if not d.keep:
-            print(f"    verifier rejected #{d.index}: {d.reason}")
-
-    keep_indexes = {
-        d.index
-        for d in parsed.decisions
-        if d.keep and 0 <= d.index < len(opps)
-    }
-    return [o for i, o in enumerate(opps) if i in keep_indexes]
 
 
 def dedupe(
     pain_points: list[PainPoint], source_items: list[SourceItem] | None = None
-) -> tuple[list[Opportunity], list[Opportunity]]:
+) -> list[Opportunity]:
+    """Merge pain points into distinct, ranked leads (real pain, junk filtered out).
+    Market validation happens later, in the enrichment step — not here."""
     if not pain_points:
-        return [], []
-    # Pre-rank by composite and cap, so the model's output stays within budget and
-    # we dedupe the strongest signals rather than the long tail.
+        return []
     ranked = sorted(pain_points, key=_composite, reverse=True)[: config.MAX_PAIN_POINTS]
     payload = json.dumps([p.model_dump() for p in ranked])
     parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 16000)
     opps = parsed.opportunities if parsed else []
     for o in opps:
         o.composite = _composite(o)
-    print(f"  - dedupe produced {len(opps)} candidate opportunities")
+    print(f"  - dedupe produced {len(opps)} candidate leads")
 
-    gated = []
-    research_leads = []
+    leads, dropped = [], []
     for o in opps:
-        if _passes_opportunity_bar(o):
-            gated.append(o)
-        else:
-            reason = _bar_reject_reason(o)
-            if _passes_research_lead_bar(o):
-                research_leads.append(o)
-                print(f"    research lead: {o.summary} ({reason})")
-            else:
-                print(f"    score gate rejected: {o.summary} ({reason})")
-    print(f"  - score gate kept {len(gated)}/{len(opps)} candidates")
-    print(f"  - research lead gate kept {len(research_leads)} candidates")
+        (leads if _passes_lead_bar(o) else dropped).append(o)
+    for o in dropped:
+        print(f"    dropped (junk/too small): {o.summary}")
+    leads.sort(key=lambda o: o.composite, reverse=True)
+    print(f"  - {len(leads)} real leads kept")
+    return leads
 
-    opps = _verify_opportunities(gated, source_items)
-    print(f"  - verifier kept {len(opps)}/{len(gated)} candidates")
-    opps.sort(key=lambda o: o.composite, reverse=True)
-    research_leads.sort(key=lambda o: o.composite, reverse=True)
-    return opps, research_leads[: config.TOP_N]
+
+def write_thesis(lead: Opportunity, context: str) -> MarketThesis | None:
+    """Turn one lead + live web-research context into a grounded buildability thesis."""
+    user = f"""Problem (from developer forums):
+{lead.summary}
+
+Evidence: {lead.evidence}
+
+Live web research context (existing tools, pricing, demand — may be empty):
+{context or '(no web research available — judge cautiously and lower conviction)'}
+
+Write the buildability thesis."""
+    thesis = _parse(_THESIS_SYS, user, MarketThesis, 4000)
+    if thesis:
+        thesis.source_ids = lead.source_ids
+    return thesis
 
 
 # --- 3. brief ------------------------------------------------------------
 
 _BRIEF_SYS = """You write a sharp daily 'builder brief' for a founder/engineer who \
-studies developer problems every morning. Tone: direct, opinionated, concrete. \
-No fluff, no hype. Do not inflate weak ideas into startup-shaped language. If the \
-evidence does not support a buyer, urgency, or wedge, say the day is thin rather than \
-pretending. Use Markdown."""
+studies developer problems every morning and wants buildable SaaS/startup ideas. Tone: \
+direct, opinionated, concrete. No hype. A crowded market is validation, not a \
+disqualifier — surface the wedge. Be honest about conviction; don't inflate a \
+low-conviction idea. Use Markdown."""
 
 # Human-readable site label per source, so links aren't mislabeled by the model.
 _SITE = {
@@ -423,77 +332,50 @@ _SITE = {
 
 
 def write_brief(
-    opps: list[Opportunity],
+    theses: list[MarketThesis],
     date_str: str,
     item_count: int,
     id_to_url: dict[str, str] | None = None,
     id_to_source: dict[str, str] | None = None,
-    research_leads: list[Opportunity] | None = None,
 ) -> str:
     id_to_url = id_to_url or {}
     id_to_source = id_to_source or {}
-    top = opps[: config.TOP_N]
-    leads = (research_leads or [])[: config.TOP_N]
 
-    # Resolve each opportunity's source_ids to {site, url} so the model cites links
-    # verbatim with the correct site label instead of guessing either.
-    def with_sources(items: list[Opportunity]) -> list[dict]:
-        payload_objs = []
-        for o in items:
-            d = o.model_dump()
-            srcs, seen = [], set()
-            for sid in d.get("source_ids", []):
-                u = id_to_url.get(sid)
-                if u and u not in seen:
-                    seen.add(u)
-                    srcs.append({"site": _SITE.get(id_to_source.get(sid, ""), "source"), "url": u})
-            d["sources"] = srcs[:5]
-            payload_objs.append(d)
-        return payload_objs
-
-    payload_objs = with_sources(top)
-    lead_payload_objs = with_sources(leads)
+    # Resolve each thesis's source_ids to {site, url} so links are cited verbatim.
+    payload_objs = []
+    for t in theses:
+        d = t.model_dump()
+        srcs, seen = [], set()
+        for sid in t.source_ids:
+            u = id_to_url.get(sid)
+            if u and u not in seen:
+                seen.add(u)
+                srcs.append({"site": _SITE.get(id_to_source.get(sid, ""), "source"), "url": u})
+        d["sources"] = srcs[:5]
+        payload_objs.append(d)
     payload = json.dumps(payload_objs, indent=2)
-    lead_payload = json.dumps(lead_payload_objs, indent=2)
 
     user = f"""Date: {date_str}
-Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub.
+Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub, then researched \
+the top leads on the live web.
 
-Strict opportunities (buyer-backed, already scored, sorted by composite):
+Buildability theses (each already grounded in web research):
 
 {payload}
 
-Research leads (real pain, but market/buyer proof is not strong enough yet):
-
-{lead_payload}
-
-Write the brief with:
-1. A 2-3 sentence '## TL;DR' of the day's strongest signal. If there are zero strict \
-opportunities but some research leads, say that clearly: "No proven opportunities, but \
-N research leads worth validating."
-2. '## Opportunities' — include one '### ' entry per strict opportunity. If there are \
-none, write exactly: `None passed the opportunity bar today.`
-Each strict opportunity entry must include: the problem, why now, who'd pay, a one-line \
-buildability read, and a `**The build:**` line naming the single concrete thing to ship \
-first (the MVP wedge — what's actually possible to build next). \
-Be skeptical and precise: do not describe generic buyers. Name the specific team, \
-role, budget owner, or adopter only if the supplied evidence supports it. Do not turn \
-feature requests, small utilities, guides, lists, or repo-specific bugs into SaaS ideas. \
-Then end the entry with these two lines. \
-The score line must look EXACTLY like this example — same word labels and '·' separators, \
-but substitute the opportunity's real integers for pain / frequency / buildability / \
-market_signal / personal_interest:
-   `**Score:** pain 4 · freq 3 · build 5 · market 2 · interest 4`
-   `**Sources:** ` followed by Markdown links built ONLY from that opportunity's \
-`sources` — use each entry's `site` as the link text and its `url` as the link target, \
-copied verbatim. Never invent a URL; omit the Sources line if `sources` is empty.
-3. '## Research Leads' — include up to {config.TOP_N} leads. These are NOT validated \
-opportunities. For each, use one '### ' entry with:
-   `**Signal:**` the concrete pain.
-   `**Why it is not ready:**` what buyer/market proof is missing.
-   `**Validate next:**` one specific research action or question.
-   `**Sources:**` links copied from `sources`.
-If there are no research leads, write exactly: `None.`
-4. '## Watchlist' — one line only if there is a weaker pattern not covered above.
-Keep it skimmable. Never upgrade research leads into opportunities."""
+Write the brief in Markdown:
+1. '## TL;DR' — 2-3 sentences on the strongest buildable idea today and why. If there are \
+zero theses, say the day was thin and stop.
+2. '## Buildable Ideas' — one '### <title>' entry per thesis, in this exact line order:
+   `**Problem:**` the pain in one line.
+   `**What exists:**` the real tools/competitors + pricing from `what_exists` (write \
+"Greenfield — no clear incumbent" if empty). A crowded market is GOOD — it proves demand.
+   `**Who'd pay:**` the buyer.
+   `**The wedge:**` where a new entrant wins (from `wedge`).
+   `**MVP:**` the first thing to build (from `mvp`).
+   `**Conviction:**` the `conviction` value (high/medium/low), then one clause on the \
+biggest risk.
+   `**Sources:**` Markdown links built ONLY from `sources` — use each entry's `site` as \
+the link text and its `url` as the target, copied verbatim. Omit if `sources` is empty.
+Keep it skimmable and honest. Order by conviction (high first). Never invent a URL."""
     return _complete(_BRIEF_SYS, user, 8000)

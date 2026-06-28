@@ -60,10 +60,33 @@ class OpportunityReview(BaseModel):
     decisions: list[OpportunityDecision]
 
 
+class MarketThesis(BaseModel):
+    """A grounded buildability thesis for one lead, written after live web research."""
+
+    title: str = Field(description="Short, concrete name for the opportunity.")
+    problem: str = Field(description="The pain, in one or two plain sentences.")
+    what_exists: list[str] = Field(
+        description="Existing tools/competitors with pricing where known; empty if greenfield."
+    )
+    demand_signal: str = Field(
+        description="Evidence of real, repeated demand or willingness to pay (or its absence)."
+    )
+    buyer: str = Field(description="The specific user/buyer who would adopt or pay.")
+    is_product: bool = Field(
+        description="True if a standalone product/SaaS; false if really a feature of an existing tool."
+    )
+    wedge: str = Field(description="The differentiated angle — where a new entrant wins.")
+    mvp: str = Field(description="The first concrete thing to build to test it.")
+    conviction: str = Field(description="high | medium | low — grounded in the evidence.")
+    biggest_risk: str = Field(description="The main reason this could fail.")
+    source_ids: list[str] = Field(default_factory=list, description="Originating post ids.")
+
+
 class RadarState(TypedDict, total=False):
     raw_items: list[SourceItem]
     pain_points: list[PainPoint]
     deduped: list[Opportunity]
     research_leads: list[Opportunity]
+    theses: list[MarketThesis]
     brief_markdown: str
     brief_path: str
