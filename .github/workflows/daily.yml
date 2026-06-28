@@ -26,6 +26,7 @@ jobs:
           # Hardcoded to OpenAI (out of Claude credit). To switch back to Claude,
           # change this line to `RADAR_PROVIDER: anthropic`.
           RADAR_PROVIDER: openai
+          RADAR_OPENAI_MODEL: gpt-5.5
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

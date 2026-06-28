@@ -18,7 +18,7 @@ PROVIDER = os.getenv("RADAR_PROVIDER", "anthropic").lower()
 MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8")
 
 # OpenAI model + key (used when RADAR_PROVIDER=openai).
-OPENAI_MODEL = os.getenv("RADAR_OPENAI_MODEL", "gpt-4o")
+OPENAI_MODEL = os.getenv("RADAR_OPENAI_MODEL", "gpt-5.5")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # --- Sources -------------------------------------------------------------
