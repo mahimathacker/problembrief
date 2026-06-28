@@ -64,5 +64,6 @@ class RadarState(TypedDict, total=False):
     raw_items: list[SourceItem]
     pain_points: list[PainPoint]
     deduped: list[Opportunity]
+    research_leads: list[Opportunity]
     brief_markdown: str
     brief_path: str

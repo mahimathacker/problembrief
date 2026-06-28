@@ -288,6 +288,19 @@ def _bar_reject_reason(o: Opportunity) -> str:
     return "unknown"
 
 
+def _passes_research_lead_bar(o: Opportunity) -> bool:
+    """Keep real-but-unproven pains visible without calling them opportunities."""
+    if o.pain < 4 or o.frequency < 3 or o.buildability < 3:
+        return False
+    if o.market_signal < 3:
+        return False
+
+    text = " ".join((o.summary, o.evidence, o.category)).lower()
+    if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
+        return False
+    return True
+
+
 def _verify_opportunities(
     opps: list[Opportunity], source_items: list[SourceItem] | None = None
 ) -> list[Opportunity]:
@@ -350,9 +363,9 @@ def _verify_opportunities(
 
 def dedupe(
     pain_points: list[PainPoint], source_items: list[SourceItem] | None = None
-) -> list[Opportunity]:
+) -> tuple[list[Opportunity], list[Opportunity]]:
     if not pain_points:
-        return []
+        return [], []
     # Pre-rank by composite and cap, so the model's output stays within budget and
     # we dedupe the strongest signals rather than the long tail.
     ranked = sorted(pain_points, key=_composite, reverse=True)[: config.MAX_PAIN_POINTS]
@@ -364,17 +377,25 @@ def dedupe(
     print(f"  - dedupe produced {len(opps)} candidate opportunities")
 
     gated = []
+    research_leads = []
     for o in opps:
         if _passes_opportunity_bar(o):
             gated.append(o)
         else:
-            print(f"    score gate rejected: {o.summary} ({_bar_reject_reason(o)})")
+            reason = _bar_reject_reason(o)
+            if _passes_research_lead_bar(o):
+                research_leads.append(o)
+                print(f"    research lead: {o.summary} ({reason})")
+            else:
+                print(f"    score gate rejected: {o.summary} ({reason})")
     print(f"  - score gate kept {len(gated)}/{len(opps)} candidates")
+    print(f"  - research lead gate kept {len(research_leads)} candidates")
 
     opps = _verify_opportunities(gated, source_items)
     print(f"  - verifier kept {len(opps)}/{len(gated)} candidates")
     opps.sort(key=lambda o: o.composite, reverse=True)
-    return opps
+    research_leads.sort(key=lambda o: o.composite, reverse=True)
+    return opps, research_leads[: config.TOP_N]
 
 
 # --- 3. brief ------------------------------------------------------------
@@ -400,37 +421,54 @@ def write_brief(
     item_count: int,
     id_to_url: dict[str, str] | None = None,
     id_to_source: dict[str, str] | None = None,
+    research_leads: list[Opportunity] | None = None,
 ) -> str:
     id_to_url = id_to_url or {}
     id_to_source = id_to_source or {}
     top = opps[: config.TOP_N]
+    leads = (research_leads or [])[: config.TOP_N]
 
     # Resolve each opportunity's source_ids to {site, url} so the model cites links
     # verbatim with the correct site label instead of guessing either.
-    payload_objs = []
-    for o in top:
-        d = o.model_dump()
-        srcs, seen = [], set()
-        for sid in d.get("source_ids", []):
-            u = id_to_url.get(sid)
-            if u and u not in seen:
-                seen.add(u)
-                srcs.append({"site": _SITE.get(id_to_source.get(sid, ""), "source"), "url": u})
-        d["sources"] = srcs[:5]
-        payload_objs.append(d)
+    def with_sources(items: list[Opportunity]) -> list[dict]:
+        payload_objs = []
+        for o in items:
+            d = o.model_dump()
+            srcs, seen = [], set()
+            for sid in d.get("source_ids", []):
+                u = id_to_url.get(sid)
+                if u and u not in seen:
+                    seen.add(u)
+                    srcs.append({"site": _SITE.get(id_to_source.get(sid, ""), "source"), "url": u})
+            d["sources"] = srcs[:5]
+            payload_objs.append(d)
+        return payload_objs
+
+    payload_objs = with_sources(top)
+    lead_payload_objs = with_sources(leads)
     payload = json.dumps(payload_objs, indent=2)
+    lead_payload = json.dumps(lead_payload_objs, indent=2)
 
     user = f"""Date: {date_str}
-Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub. Top \
-opportunities (already scored, sorted by composite):
+Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub.
+
+Strict opportunities (buyer-backed, already scored, sorted by composite):
 
 {payload}
 
+Research leads (real pain, but market/buyer proof is not strong enough yet):
+
+{lead_payload}
+
 Write the brief with:
-1. A 2-3 sentence '## TL;DR' of the day's strongest signal.
-2. '## Opportunities' — one '### ' entry per opportunity with: the problem, why now, \
-who'd pay, a one-line buildability read, and a `**The build:**` line naming the single \
-concrete thing to ship first (the MVP wedge — what's actually possible to build next). \
+1. A 2-3 sentence '## TL;DR' of the day's strongest signal. If there are zero strict \
+opportunities but some research leads, say that clearly: "No proven opportunities, but \
+N research leads worth validating."
+2. '## Opportunities' — include one '### ' entry per strict opportunity. If there are \
+none, write exactly: `None passed the opportunity bar today.`
+Each strict opportunity entry must include: the problem, why now, who'd pay, a one-line \
+buildability read, and a `**The build:**` line naming the single concrete thing to ship \
+first (the MVP wedge — what's actually possible to build next). \
 Be skeptical and precise: do not describe generic buyers. Name the specific team, \
 role, budget owner, or adopter only if the supplied evidence supports it. Do not turn \
 feature requests, small utilities, guides, lists, or repo-specific bugs into SaaS ideas. \
@@ -442,8 +480,13 @@ market_signal / personal_interest:
    `**Sources:** ` followed by Markdown links built ONLY from that opportunity's \
 `sources` — use each entry's `site` as the link text and its `url` as the link target, \
 copied verbatim. Never invent a URL; omit the Sources line if `sources` is empty.
-3. '## Watchlist' — one line on weaker-but-interesting threads, if any.
-Keep it skimmable. Include every opportunity you're given above (they're already filtered \
-and ranked) — one '### ' entry each. Only call the day "thin" in the TL;DR if you were \
-genuinely handed just one or two."""
+3. '## Research Leads' — include up to {config.TOP_N} leads. These are NOT validated \
+opportunities. For each, use one '### ' entry with:
+   `**Signal:**` the concrete pain.
+   `**Why it is not ready:**` what buyer/market proof is missing.
+   `**Validate next:**` one specific research action or question.
+   `**Sources:**` links copied from `sources`.
+If there are no research leads, write exactly: `None.`
+4. '## Watchlist' — one line only if there is a weaker pattern not covered above.
+Keep it skimmable. Never upgrade research leads into opportunities."""
     return _complete(_BRIEF_SYS, user, 8000)
