@@ -104,14 +104,23 @@ def _render_items(items: list[SourceItem]) -> str:
 
 # --- 1. extract ----------------------------------------------------------
 
-_EXTRACT_SYS = f"""You analyze posts AND their comment threads from developer \
-communities and extract concrete, buildable PAIN POINTS — real frustrations, repeated \
-complaints, or unmet needs someone could turn into a product.
+_EXTRACT_SYS = f"""You analyze posts, comment threads, AND web articles — from developer \
+communities and the wider web — and extract concrete, buildable PAIN POINTS: real \
+frustrations, repeated complaints, or unmet needs someone could turn into a product. \
+The pain can belong to DEVELOPERS, to NORMAL BUSINESSES (restaurants, clinics, shops, \
+agencies, real-estate, logistics, gyms, law firms…), or to EVERYDAY people — all are \
+welcome.
 
 Reading the input:
 - A post may include a "Top comments:" section. Treat comments as the strongest \
 evidence — agreement, "me too", described workarounds, and "is there a way to…" all \
 signal real, shared pain.
+- Some items are web articles describing an industry's problems. Extract the real \
+underlying pain they describe; don't reject an item just because it's an article.
+- IMPORTANT: do NOT let AI/infra/dev-tooling topics crowd out everything else. Actively \
+pull problems from OTHER categories too — normal businesses, and other tech areas (web, \
+mobile, data, fintech, e-commerce, healthcare, marketing). Variety across categories is \
+a goal.
 
 What to extract:
 - Be strict: return only the strongest 1-4 pain points per batch (or zero if the batch \
@@ -341,6 +350,7 @@ _SITE = {
     "lobsters": "Lobsters",
     "devto": "Dev.to",
     "github": "GitHub",
+    "web": "Web",
 }
 
 

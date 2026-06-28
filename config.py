@@ -98,6 +98,38 @@ HN_RECENCY_DAYS = int(os.getenv("RADAR_HN_RECENCY_DAYS", "21"))
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "5"))
 
+# Beyond dev forums: discover real-world pain in OTHER categories (normal businesses,
+# non-AI tech) via rotating web searches, so the brief isn't all AI-infra. A rotating
+# subset runs each day. Needs TAVILY_API_KEY; skipped without it.
+DISCOVERY_QUERIES = [
+    q.strip()
+    for q in os.getenv(
+        "RADAR_DISCOVERY_QUERIES",
+        ";".join(
+            [
+                "small business owners frustrated with their current software",
+                "what software do restaurant and cafe owners wish existed",
+                "manual time-wasting tasks at dental and medical clinics",
+                "tools real estate agents complain about",
+                "accountants and bookkeepers frustrated with their software",
+                "logistics and shipping teams software pain points",
+                "gym and salon owners frustrated with booking software",
+                "retail and ecommerce sellers frustrated with their tools",
+                "law firms frustrated with legal software",
+                "non-AI developer tools people are frustrated with",
+                "mobile app developers frustrated with their tooling",
+                "data engineers frustrated with their current tools",
+                "fintech and payments teams software pain points",
+                "marketing and sales teams frustrated with their software",
+                "property managers and landlords software frustrations",
+                "freelancers frustrated with invoicing and client management",
+            ]
+        ),
+    ).split(";")
+    if q.strip()
+]
+DISCOVERY_PER_DAY = int(os.getenv("RADAR_DISCOVERY_PER_DAY", "5"))
+
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
 INTERESTS = [
@@ -110,13 +142,26 @@ INTERESTS = [
 ]
 
 CATEGORIES = [
+    # dev / AI
     "ai_agents",
     "devtools",
     "dx",
     "automation",
     "apis_sdks",
     "databases",
+    "web",
+    "mobile",
+    "data",
+    "security",
+    # business / vertical / everyday
+    "fintech",
+    "ecommerce",
+    "healthtech",
+    "marketing",
+    "vertical_saas",
+    "small_business",
     "creator_tools",
+    "consumer",
     "other",
 ]
 

@@ -30,8 +30,27 @@ def dedupe_similar(state: RadarState) -> RadarState:
     return {"deduped": llm.dedupe(pp, raw)}
 
 
+def _select_diverse(leads, n, per_category=2):
+    """Pick the top n leads by score but cap how many share a category, so the brief
+    spans categories instead of being all one thing (e.g. all AI infra)."""
+    chosen, counts = [], {}
+    for o in leads:  # already sorted by composite, highest first
+        c = o.category or "other"
+        if counts.get(c, 0) < per_category:
+            chosen.append(o)
+            counts[c] = counts.get(c, 0) + 1
+        if len(chosen) >= n:
+            return chosen
+    for o in leads:  # if caps left us short, fill the rest by score
+        if o not in chosen:
+            chosen.append(o)
+            if len(chosen) >= n:
+                break
+    return chosen
+
+
 def enrich_leads(state: RadarState) -> RadarState:
-    leads = state.get("deduped", [])[: config.ENRICH_TOP_N]
+    leads = _select_diverse(state.get("deduped", []), config.ENRICH_TOP_N)
     print(f"[4/6] enriching {len(leads)} leads with live market research…")
     theses = []
     for lead in leads:

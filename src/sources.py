@@ -290,6 +290,42 @@ def fetch_github(queries: list[str], limit: int, token: str = "") -> list[Source
     return items
 
 
+# --- Web discovery (beyond dev forums) -----------------------------------
+
+def fetch_web_pain(limit: int) -> list[SourceItem]:
+    """Discover real-world pain OUTSIDE dev forums — normal businesses and non-AI
+    tech — via rotating Tavily web searches, so the brief isn't all AI-infra.
+    Skipped without a Tavily key."""
+    if not config.TAVILY_API_KEY:
+        print("  - web: skipped (set TAVILY_API_KEY to discover non-dev categories)")
+        return []
+    from src import enrich  # lazy import; enrich only depends on config
+
+    queries = _daily_rotation(config.DISCOVERY_QUERIES, config.DISCOVERY_PER_DAY)
+    items: list[SourceItem] = []
+    seen: set[str] = set()
+    for q in queries:
+        data = enrich._search(q, max_results=5)
+        for res in data.get("results", []):
+            url = res.get("url", "")
+            title = res.get("title", "")
+            if not title or url in seen:
+                continue
+            seen.add(url)
+            items.append(
+                SourceItem(
+                    id=f"web-{len(items)}",
+                    source="web",
+                    title=title,
+                    text=_clean(res.get("content"), 1500),
+                    url=url,
+                )
+            )
+            if len(items) >= limit:
+                return items
+    return items
+
+
 # --- Orchestrator --------------------------------------------------------
 
 def fetch_all() -> list[SourceItem]:
@@ -304,6 +340,7 @@ def fetch_all() -> list[SourceItem]:
             config.MAX_PER_SOURCE,
             config.GITHUB_TOKEN,
         )),
+        ("web", lambda: fetch_web_pain(config.MAX_PER_SOURCE)),
     ):
         try:
             got = fn()

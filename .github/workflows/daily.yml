@@ -13,6 +13,8 @@ jobs:
       contents: write  # allow committing the brief + dedup state back to the repo
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so the commit-back step can rebase
 
       - uses: actions/setup-python@v5
         with:
@@ -44,7 +46,18 @@ jobs:
           git add briefs state
           if git diff --cached --quiet; then
             echo "No changes to commit."
-          else
-            git commit -m "Daily brief $(date -u +%F)"
-            git push
+            exit 0
           fi
+          git commit -m "Daily brief $(date -u +%F)"
+          # The remote may have moved on (you pushed, or a prior run committed). Rebase
+          # our commit on top and retry; prefer our freshly generated files on conflict.
+          for attempt in 1 2 3; do
+            if git pull --rebase -X theirs origin master && git push origin master; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push attempt $attempt failed; retrying…"
+            sleep 5
+          done
+          echo "could not push after 3 attempts" >&2
+          exit 1
