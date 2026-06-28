@@ -67,7 +67,8 @@ Everything tunable lives in `config.py` (override via `.env`):
 - `RADAR_GITHUB_QUERIES` — what GitHub issue searches to run (semicolon-separated)
 - `RADAR_GITHUB_RECENCY_DAYS` — only pull GitHub issues created in the last N days (default 30)
 - `RADAR_DEDUP_DAYS` — don't resurface a problem within N days (default 7)
-- `RADAR_TOP_N` — opportunities included in the brief
+- `RADAR_ENRICH_TOP_N` — max leads to research and include (default 10; fewer when the day is thin)
+- `RADAR_TOP_N` — legacy top-opportunity limit
 - `WEIGHTS` — composite-score weighting (edit in `config.py`)
 
 ## Email setup (optional)

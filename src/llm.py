@@ -123,8 +123,9 @@ mobile, data, fintech, e-commerce, healthcare, marketing). Variety across catego
 a goal.
 
 What to extract:
-- Be strict: return only the strongest 1-4 pain points per batch (or zero if the batch \
-does not contain a real opportunity). A thin day is better than a fake brief.
+- Be strict but keep category coverage: return the strongest 2-6 pain points per batch \
+(or zero if the batch has no real signal). When a batch contains both builder/dev/AI \
+pain and small-business/vertical pain, keep at least one of each if both are concrete.
 - Favor REAL, GENUINE problems whose solution would meaningfully help people — \
 developers OR everyday/non-technical users. Real impact on real people matters more \
 than novelty or cleverness.

@@ -30,17 +30,61 @@ def dedupe_similar(state: RadarState) -> RadarState:
     return {"deduped": llm.dedupe(pp, raw)}
 
 
-def _select_diverse(leads, n, per_category=2):
-    """Pick the top n leads by score but cap how many share a category, so the brief
-    spans categories instead of being all one thing (e.g. all AI infra)."""
-    chosen, counts = [], {}
-    for o in leads:  # already sorted by composite, highest first
+_BUILDER_CATEGORIES = {
+    "ai_agents",
+    "devtools",
+    "dx",
+    "automation",
+    "apis_sdks",
+    "databases",
+    "web",
+    "mobile",
+    "data",
+    "security",
+}
+
+_BUSINESS_CATEGORIES = {
+    "fintech",
+    "ecommerce",
+    "healthtech",
+    "marketing",
+    "vertical_saas",
+    "small_business",
+    "creator_tools",
+    "consumer",
+}
+
+
+def _add_diverse(chosen, leads, limit, per_category=2):
+    counts = {}
+    for o in chosen:
+        c = o.category or "other"
+        counts[c] = counts.get(c, 0) + 1
+    for o in leads:
+        if o in chosen:
+            continue
         c = o.category or "other"
         if counts.get(c, 0) < per_category:
             chosen.append(o)
             counts[c] = counts.get(c, 0) + 1
-        if len(chosen) >= n:
-            return chosen
+        if len(chosen) >= limit:
+            break
+
+
+def _select_diverse(leads, n, per_category=2):
+    """Pick top leads while reserving room for both builder/dev/AI and business pain."""
+    chosen = []
+    builder = [o for o in leads if (o.category or "other") in _BUILDER_CATEGORIES]
+    business = [o for o in leads if (o.category or "other") in _BUSINESS_CATEGORIES]
+
+    if builder:
+        chosen.append(builder[0])
+    if business and len(chosen) < n:
+        chosen.append(business[0])
+
+    _add_diverse(chosen, leads, n, per_category)
+    if len(chosen) >= n:
+        return chosen[:n]
     for o in leads:  # if caps left us short, fill the rest by score
         if o not in chosen:
             chosen.append(o)
@@ -52,6 +96,9 @@ def _select_diverse(leads, n, per_category=2):
 def enrich_leads(state: RadarState) -> RadarState:
     leads = _select_diverse(state.get("deduped", []), config.ENRICH_TOP_N)
     print(f"[4/6] enriching {len(leads)} leads with live market research…")
+    if leads:
+        cats = ", ".join(o.category or "other" for o in leads)
+        print(f"  - selected categories: {cats}")
     theses = []
     for lead in leads:
         context = enrich.market_context(lead.summary)
