@@ -214,10 +214,16 @@ Rules:
 If the context is thin, say so and lower conviction — don't bluff.
 - Be honest about feature-vs-product: if the fix obviously belongs inside one existing \
 tool, set is_product=false and lower conviction.
+- If the context shows pricing or adoption numbers, CITE them in what_exists / \
+demand_signal (e.g. "Portkey ~$49/mo", "Kafka is the default backbone"). If pricing \
+truly isn't there, say "pricing unclear" in three words — don't write a long disclaimer.
 - conviction: high = real pain + a market where people clearly pay + a credible wedge; \
 medium = real pain but the wedge or demand is unproven; low = likely a feature, thin \
-demand, or no defensible angle.
-- biggest_risk must be the honest main reason this fails.
+demand, or no defensible angle. SPREAD conviction honestly — do NOT default everything \
+to medium. "Incumbents will absorb it" is a real risk for thin infra layers, but a \
+sharp wedge with large proven paying demand can still earn high.
+- biggest_risk must be the honest main reason THIS specific idea fails — vary it, don't \
+reuse "incumbents will absorb it" for everything.
 Return a single thesis."""
 
 
@@ -316,11 +322,15 @@ Write the buildability thesis."""
 
 # --- 3. brief ------------------------------------------------------------
 
-_BRIEF_SYS = """You write a sharp daily 'builder brief' for a founder/engineer who \
-studies developer problems every morning and wants buildable SaaS/startup ideas. Tone: \
-direct, opinionated, concrete. No hype. A crowded market is validation, not a \
-disqualifier — surface the wedge. Be honest about conviction; don't inflate a \
-low-conviction idea. Use Markdown."""
+_BRIEF_SYS = """You write a daily 'builder brief' for someone who studies developer \
+problems every morning and wants buildable SaaS/startup ideas.
+
+Write in VERY SIMPLE, plain English. Short sentences. Everyday words. No jargon or fancy \
+vocabulary — never use words like "wedge", "moat", "leverage", "paradigm", "incumbent", \
+or "greenfield". Explain each idea like you're talking to a smart friend who is not a \
+native English speaker. Be direct and concrete, no hype. A crowded market is a GOOD \
+sign, not a reason to skip — show how a new tool could still win. Be honest about how \
+confident you are. Use Markdown."""
 
 # Human-readable site label per source, so links aren't mislabeled by the model.
 _SITE = {
@@ -367,15 +377,16 @@ Write the brief in Markdown:
 1. '## TL;DR' — 2-3 sentences on the strongest buildable idea today and why. If there are \
 zero theses, say the day was thin and stop.
 2. '## Buildable Ideas' — one '### <title>' entry per thesis, in this exact line order:
-   `**Problem:**` the pain in one line.
-   `**What exists:**` the real tools/competitors + pricing from `what_exists` (write \
-"Greenfield — no clear incumbent" if empty). A crowded market is GOOD — it proves demand.
-   `**Who'd pay:**` the buyer.
-   `**The wedge:**` where a new entrant wins (from `wedge`).
-   `**MVP:**` the first thing to build (from `mvp`).
-   `**Conviction:**` the `conviction` value (high/medium/low), then one clause on the \
-biggest risk.
+   `**Problem:**` the pain in one simple line.
+   `**What's already out there:**` the real tools + their prices from `what_exists` \
+(write "No clear competitor yet" if empty). Many tools already there is a GOOD sign — \
+it means people want this.
+   `**Who'd pay:**` who buys it, in plain words.
+   `**How you'd win:**` how a new tool could still beat what's out there (from `wedge`).
+   `**First build:**` the first thing to build (from `mvp`).
+   `**Confidence:**` the `conviction` value (high / medium / low), then one short, plain \
+line on the biggest reason it could fail.
    `**Sources:**` Markdown links built ONLY from `sources` — use each entry's `site` as \
 the link text and its `url` as the target, copied verbatim. Omit if `sources` is empty.
-Keep it skimmable and honest. Order by conviction (high first). Never invent a URL."""
+Keep it short and easy to read. Most confident ideas first. Never invent a URL."""
     return _complete(_BRIEF_SYS, user, 8000)
