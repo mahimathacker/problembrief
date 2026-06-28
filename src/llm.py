@@ -210,6 +210,9 @@ wins on (a sharper niche, better DX, a specific user, a missing integration), NO
 "already done". Genuinely empty markets where nobody pays are the real risk.
 
 Rules:
+- Write EVERY text field in very simple, plain English: short sentences, everyday words, \
+no jargon (no "wedge", "moat", "incumbent", "greenfield", "leverage"). Say "big existing \
+companies" instead of "incumbents". Write so a smart non-native English speaker gets it.
 - Ground every claim in the provided web context. Do NOT invent competitors or pricing. \
 If the context is thin, say so and lower conviction — don't bluff.
 - Be honest about feature-vs-product: if the fix obviously belongs inside one existing \
