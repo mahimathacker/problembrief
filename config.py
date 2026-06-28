@@ -115,9 +115,9 @@ CATEGORIES = [
 # --- Scoring weights (composite = weighted sum of the 1-5 sub-scores) -----
 WEIGHTS = {
     "pain": 0.30,
-    "frequency": 0.25,
-    "buildability": 0.20,
-    "market_signal": 0.15,
+    "frequency": 0.20,
+    "buildability": 0.10,
+    "market_signal": 0.30,
     "personal_interest": 0.10,
 }
 
@@ -126,7 +126,7 @@ WEIGHTS = {
 MAX_PAIN_POINTS = int(os.getenv("RADAR_MAX_PAIN_POINTS", "40"))
 
 # How many opportunities make the brief.
-TOP_N = int(os.getenv("RADAR_TOP_N", "8"))
+TOP_N = int(os.getenv("RADAR_TOP_N", "5"))
 
 # --- Output --------------------------------------------------------------
 ROOT = Path(__file__).parent

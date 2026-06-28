@@ -103,17 +103,22 @@ evidence — agreement, "me too", described workarounds, and "is there a way to�
 signal real, shared pain.
 
 What to extract:
-- Be SELECTIVE but not stingy: return the 3-5 strongest pain points per batch (or zero \
-if there's truly no signal). A vague theme is worse than nothing, but don't drop a real, \
-concrete problem just to keep the list short.
+- Be strict: return only the strongest 1-4 pain points per batch (or zero if the batch \
+does not contain a real opportunity). A thin day is better than a fake brief.
 - Favor REAL, GENUINE problems whose solution would meaningfully help people — \
 developers OR everyday/non-technical users. Real impact on real people matters more \
 than novelty or cleverness.
 - Prefer specific problems ("X has no good way to do Y") over broad topics ("AI is hard").
-- The goal is a BUILDABLE IDEA — a real problem you could turn into a startup, a demo, \
-or a genuinely better tool/app that helps developers OR everyday people. Judge each by: \
-is it real, is it actually felt, and could a small team ship something people would use \
-(and ideally pay for)?
+- The goal is a HIGH-QUALITY PRODUCT OPPORTUNITY — a real problem with a clear user, \
+a believable buyer/adopter, repeated or intense pain, and a plausible wedge a small \
+team could ship. Useful tools are welcome, but only if they could become a durable \
+product, business, or widely adopted workflow.
+- Reject "just a feature" ideas: one app/library missing a setting, a small UX fix, \
+a how-to guide, a curated list, a compatibility tweak, a wrapper around one API, or \
+generic automation with no clear buyer.
+- Reject weak market logic: if the only buyer is a vague group like "developers", \
+"SaaS companies", "platforms", or "enterprises" without evidence of budget, adoption, \
+switching, compliance pressure, revenue loss, or repeated workaround pain, do not extract it.
 - SKIP nice-to-haves and saturated categories (yet-another note-taking / journaling / \
 to-do / blogging app, personal-productivity fluff) unless the discussion shows people \
 actually paying or switching.
@@ -124,8 +129,9 @@ actually paying or switching.
 Scoring (1-5 — calibrate honestly; most things are 2-3, reserve 5):
 - pain: 1 = mild annoyance, 5 = blocks real work / felt daily.
 - frequency: 1 = one mention, 5 = echoed across many posts/comments.
-- buildability: 1 = needs a huge moat or scale, 5 = a small team could ship a useful MVP in weeks.
-- market_signal: 1 = no sign anyone'd pay, 5 = people asking for it or paying for workarounds.
+- buildability: 1 = needs a huge moat or scale, 5 = a small team could ship a wedge in weeks.
+- market_signal: 1 = no sign anyone'd pay/adopt, 5 = budget/adoption pressure, paid \
+workarounds, switching intent, compliance risk, or direct purchasing language.
 - personal_interest: fit with the user's interests: {_INTERESTS}."""
 
 
@@ -152,14 +158,15 @@ into a focused set of opportunities.
 
 Rules:
 - Merge duplicates and near-duplicates into one opportunity; combine their source_ids.
-- Rank by genuine pain × how underserved it is × willingness-to-pay. Keep only ideas \
-worth building into a startup, demo, or better tool/app for developers or everyday people.
-- DROP anything vague, saturated, or not genuinely buildable. A single-source pain point \
-can still be a real opportunity if it's concrete and clearly painful — just don't give \
-it a high frequency score.
-- AIM for the ~6-8 strongest DISTINCT opportunities. Return fewer only when the day is \
-genuinely thin on real signal. Don't pad with weak ideas, but don't merge clearly \
-different problems together or drop solid ones just to shorten the list.
+- Rank by genuine pain × underserved market × willingness-to-pay/adopt. Keep only ideas \
+that could become a strong product opportunity, not merely a feature request or demo.
+- DROP anything vague, saturated, low-stakes, generic, or mostly solved by a small \
+setting/plugin/script/guide/list. Also drop repo-specific feature requests unless they \
+reveal a broader repeated workflow pain with a clear buyer.
+- A single-source pain point can survive only if the pain is acute AND market_signal is \
+strong. Otherwise treat it as anecdote, not an opportunity.
+- AIM for the ~3-5 strongest DISTINCT opportunities. Return fewer, even zero, when the \
+day is thin. Do not pad the brief.
 - When merging, set frequency to reflect how many distinct posts/comments mention it; \
 take the strongest pain/market_signal among merged items; keep buildability and \
 personal_interest as your best estimate.
@@ -173,6 +180,41 @@ def _composite(obj) -> float:
     return round(sum(getattr(obj, k) * w for k, w in config.WEIGHTS.items()), 3)
 
 
+_WEAK_OPPORTUNITY_TERMS = (
+    "auto-save",
+    "autosave",
+    "browser plugin",
+    "browser extension",
+    "chrome extension",
+    "guide",
+    "curated list",
+    "vetted list",
+    "comparative guide",
+    "setting",
+    "config tweak",
+    "toggle",
+    "wrapper",
+    "missing field",
+    "abortearly",
+)
+
+
+def _passes_opportunity_bar(o: Opportunity) -> bool:
+    """Deterministic guardrail against polished but weak product ideas."""
+    if o.pain < 4 or o.market_signal < 3:
+        return False
+    if o.frequency < 3 and o.market_signal < 5:
+        return False
+    if o.buildability < 2:
+        return False
+
+    text = " ".join((o.summary, o.evidence, o.category)).lower()
+    if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
+        # Allow small-sounding ideas only when the model found exceptional market pull.
+        return o.pain >= 5 and o.market_signal >= 5 and o.frequency >= 4
+    return True
+
+
 def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
     if not pain_points:
         return []
@@ -184,6 +226,7 @@ def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
     opps = parsed.opportunities if parsed else []
     for o in opps:
         o.composite = _composite(o)
+    opps = [o for o in opps if _passes_opportunity_bar(o)]
     opps.sort(key=lambda o: o.composite, reverse=True)
     return opps
 
@@ -192,7 +235,9 @@ def dedupe(pain_points: list[PainPoint]) -> list[Opportunity]:
 
 _BRIEF_SYS = """You write a sharp daily 'builder brief' for a founder/engineer who \
 studies developer problems every morning. Tone: direct, opinionated, concrete. \
-No fluff, no hype. Use Markdown."""
+No fluff, no hype. Do not inflate weak ideas into startup-shaped language. If the \
+evidence does not support a buyer, urgency, or wedge, say the day is thin rather than \
+pretending. Use Markdown."""
 
 # Human-readable site label per source, so links aren't mislabeled by the model.
 _SITE = {
@@ -240,6 +285,9 @@ Write the brief with:
 2. '## Opportunities' — one '### ' entry per opportunity with: the problem, why now, \
 who'd pay, a one-line buildability read, and a `**The build:**` line naming the single \
 concrete thing to ship first (the MVP wedge — what's actually possible to build next). \
+Be skeptical and precise: do not describe generic buyers. Name the specific team, \
+role, budget owner, or adopter only if the supplied evidence supports it. Do not turn \
+feature requests, small utilities, guides, lists, or repo-specific bugs into SaaS ideas. \
 Then end the entry with these two lines. \
 The score line must look EXACTLY like this example — same word labels and '·' separators, \
 but substitute the opportunity's real integers for pain / frequency / buildability / \
