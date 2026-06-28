@@ -103,8 +103,9 @@ evidence — agreement, "me too", described workarounds, and "is there a way to�
 signal real, shared pain.
 
 What to extract:
-- Be SELECTIVE. Quality over coverage: return at most the 3-4 strongest pain points \
-per batch, or zero if there's no real signal. A vague theme is worse than nothing.
+- Be SELECTIVE but not stingy: return the 3-5 strongest pain points per batch (or zero \
+if there's truly no signal). A vague theme is worse than nothing, but don't drop a real, \
+concrete problem just to keep the list short.
 - Favor REAL, GENUINE problems whose solution would meaningfully help people — \
 developers OR everyday/non-technical users. Real impact on real people matters more \
 than novelty or cleverness.
@@ -153,11 +154,12 @@ Rules:
 - Merge duplicates and near-duplicates into one opportunity; combine their source_ids.
 - Rank by genuine pain × how underserved it is × willingness-to-pay. Keep only ideas \
 worth building into a startup, demo, or better tool/app for developers or everyday people.
-- DROP anything vague, saturated, or not genuinely buildable. A pain point from a single \
-uncorroborated source is watchlist material at best — do NOT promote it to a top \
-opportunity or give it a high frequency score.
-- Be ruthless: returning only 2-3 strong, buildable ideas (or fewer) on a thin day is \
-correct. Never pad the list to hit a number.
+- DROP anything vague, saturated, or not genuinely buildable. A single-source pain point \
+can still be a real opportunity if it's concrete and clearly painful — just don't give \
+it a high frequency score.
+- AIM for the ~6-8 strongest DISTINCT opportunities. Return fewer only when the day is \
+genuinely thin on real signal. Don't pad with weak ideas, but don't merge clearly \
+different problems together or drop solid ones just to shorten the list.
 - When merging, set frequency to reflect how many distinct posts/comments mention it; \
 take the strongest pain/market_signal among merged items; keep buildability and \
 personal_interest as your best estimate.
@@ -247,6 +249,7 @@ market_signal / personal_interest:
 `sources` — use each entry's `site` as the link text and its `url` as the link target, \
 copied verbatim. Never invent a URL; omit the Sources line if `sources` is empty.
 3. '## Watchlist' — one line on weaker-but-interesting threads, if any.
-Keep it skimmable. If only a couple of opportunities are genuinely strong, include only \
-those and note in the TL;DR that the signal was thin today — never pad to fill space."""
+Keep it skimmable. Include every opportunity you're given above (they're already filtered \
+and ranked) — one '### ' entry each. Only call the day "thin" in the TL;DR if you were \
+genuinely handed just one or two."""
     return _complete(_BRIEF_SYS, user, 8000)
