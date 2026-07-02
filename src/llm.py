@@ -176,35 +176,33 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
         if parsed:
             out.extend(parsed.pain_points)
         print(f"  - extracted from batch {start // batch_size + 1}: {len(out)} total")
+
+    from collections import Counter
+
+    print(f"  - extracted by category: {dict(Counter(p.category for p in out))}")
+    for p in out:
+        print(f"      [{p.category}] pain{p.pain} mkt{p.market_signal} build{p.buildability} · {p.summary}")
     return out
 
 
 # --- 2. dedupe -----------------------------------------------------------
 
-_DEDUPE_SYS = """You are given pain points extracted from many posts. Consolidate them \
-into a focused set of opportunities.
+_DEDUPE_SYS = """You merge a list of pain points into a set of DISTINCT leads. A later \
+step researches the market and writes the thesis, and code then picks a \
+category-balanced shortlist — so your ONLY job here is to merge true duplicates and keep \
+everything else. Do NOT judge the market, pick winners, cap the count, or reject \
+feature-shaped or vendor-adjacent ideas.
 
 Rules:
-- Merge duplicates and near-duplicates into one opportunity; combine their source_ids.
-- Rank by genuine pain × underserved market × willingness-to-pay/adopt. Keep only ideas \
-that could become a strong product opportunity, not merely a feature request or demo.
-- DROP anything vague, saturated, low-stakes, generic, or mostly solved by a small \
-setting/plugin/script/guide/list. Also drop repo-specific feature requests unless they \
-reveal a broader repeated workflow pain with a clear buyer.
-- DROP self-improvement, personal productivity, documentation journey, tool overload, \
-and "centralized hub" ideas unless the evidence shows urgent team-level budget, \
-compliance risk, or revenue loss.
-- DROP vendor-specific bugs, deprecations, rate limits, outages, and missing features \
-when the best answer is "the vendor should fix it." Do not convert those into generic \
-monitoring dashboards, patched forks, or alerting tools unless the evidence proves \
-people already pay for that workaround.
-- A single-source pain point can survive only if the pain is acute AND market_signal is \
-strong. Otherwise treat it as anecdote, not an opportunity.
-- AIM for the ~3-5 strongest DISTINCT opportunities. Return fewer, even zero, when the \
-day is thin. Do not pad the brief.
-- When merging, set frequency to reflect how many distinct posts/comments mention it; \
-take the strongest pain/market_signal among merged items; keep buildability and \
-personal_interest as your best estimate.
+- Merge only real duplicates / near-duplicates (the same core problem); combine their \
+source_ids. Do NOT merge clearly different problems together.
+- Keep EVERY distinct pain, across ALL categories. Do not collapse to a few themes and \
+do not let one category (like AI) crowd out the rest. Return the full distinct set — \
+typically most of the input.
+- Drop ONLY exact duplicates or items that are not real problems.
+- Keep each item's `category` unchanged. When merging, set frequency to how many \
+distinct posts mention it; take the strongest pain/market_signal among merged items; \
+keep buildability and personal_interest as your best estimate.
 - Keep the clearest one-sentence summary and the single best piece of evidence.
 - Leave `composite` at 0 — it is computed downstream.
 - Do not invent new pain points; only consolidate what's given."""
@@ -310,9 +308,11 @@ def dedupe(
     for o in opps:
         (leads if _passes_lead_bar(o) else dropped).append(o)
     for o in dropped:
-        print(f"    dropped (junk/too small): {o.summary}")
+        print(f"    dropped (junk/too small): [{o.category}] {o.summary}")
     leads.sort(key=lambda o: o.composite, reverse=True)
-    print(f"  - {len(leads)} real leads kept")
+    print(f"  - {len(leads)} real leads kept:")
+    for o in leads:
+        print(f"      [{o.category}] composite {o.composite} · {o.summary}")
     return leads
 
 

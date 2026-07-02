@@ -96,7 +96,7 @@ HN_RECENCY_DAYS = int(os.getenv("RADAR_HN_RECENCY_DAYS", "21"))
 # a product thesis. Without a key, enrichment is skipped and theses are ungrounded
 # (lower conviction). Free key: https://tavily.com
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
-ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "10"))
+ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "8"))
 
 # Beyond dev forums: discover real-world pain in OTHER categories (normal businesses,
 # non-AI tech) via rotating web searches, so the brief isn't all AI-infra. A rotating
