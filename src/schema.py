@@ -80,6 +80,18 @@ class MarketThesis(BaseModel):
     mvp: str = Field(description="The first concrete thing to build to test it.")
     conviction: str = Field(description="high | medium | low — grounded in the evidence.")
     biggest_risk: str = Field(description="The main reason this could fail.")
+    big_company_risk: str = Field(
+        default="unknown",
+        description="low | medium | high — risk that a big platform or dominant tool adds it.",
+    )
+    niche_score: int = Field(
+        default=3,
+        description="1-5: 5 means a tiny specific ICP that cannot be segmented much further.",
+    )
+    boring_score: int = Field(
+        default=3,
+        description="1-5: 5 means boring/service-like/unsexy work with less builder competition.",
+    )
     source_ids: list[str] = Field(default_factory=list, description="Originating post ids.")
 
 

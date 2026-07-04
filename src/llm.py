@@ -247,6 +247,15 @@ if the biggest risk is "a big company can add this", conviction CANNOT be high �
 at medium, usually low. Spread conviction honestly; don't default everything to medium.
 - biggest_risk must be the honest main reason THIS specific idea fails — vary it, and \
 name the specific big company or tool that would absorb it when that's the real risk.
+- Set big_company_risk explicitly:
+  low = hard for a big platform to absorb because it needs niche workflow/service work.
+  medium = a big tool could add part of it, but niche execution still matters.
+  high = Microsoft/GitHub/AWS/Google/OpenAI/Anthropic/Notion/etc. or the dominant tool \
+could add it as a feature.
+- Set niche_score 1-5. 5 means a tiny concrete ICP like "small law firms with 5-30 \
+staff doing billable time cleanup", not "developers" or "all security teams".
+- Set boring_score 1-5. 5 means dull service-like operational work; 1 means trendy AI \
+infra or a flashy feature many builders will chase.
 Return a single thesis."""
 
 
@@ -355,8 +364,9 @@ Write in VERY SIMPLE, plain English. Short sentences. Everyday words. No jargon 
 vocabulary — never use words like "wedge", "moat", "leverage", "paradigm", "incumbent", \
 or "greenfield". Explain each idea like you're talking to a smart friend who is not a \
 native English speaker. Be direct and concrete, no hype. A crowded market is a GOOD \
-sign, not a reason to skip — show how a new tool could still win. Be honest about how \
-confident you are. Use Markdown."""
+sign only when it is crowded with focused tools that charge money. A market owned by \
+Microsoft/GitHub/AWS/Google/OpenAI/Anthropic or the dominant workflow tool is a danger, \
+not validation. Prefer boring, narrow niches. Be honest about confidence. Use Markdown."""
 
 # Human-readable site label per source, so links aren't mislabeled by the model.
 _SITE = {
@@ -413,6 +423,11 @@ it means people want this.
    `**Who'd pay:**` who buys it, in plain words.
    `**How you'd win:**` how a new tool could still beat what's out there (from `wedge`).
    `**First build:**` the first thing to build (from `mvp`).
+   `**Niche test:**` say who the tiny ICP is, then include `niche_score`/5.
+   `**Boring test:**` say why this is or is not unsexy operational work, then include \
+`boring_score`/5.
+   `**Big-company risk:**` include `big_company_risk` and name the likely absorber if \
+the risk is medium/high.
    `**Confidence:**` the `conviction` value (high / medium / low), then one short, plain \
 line on the biggest reason it could fail.
    `**Sources:**` Markdown links built ONLY from `sources` — use each entry's `site` as \

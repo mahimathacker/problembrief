@@ -106,7 +106,43 @@ def enrich_leads(state: RadarState) -> RadarState:
         if thesis:
             theses.append(thesis)
             print(f"  - thesis: {thesis.title} (conviction={thesis.conviction})")
+    theses = _filter_and_rank_theses(theses)
     return {"theses": theses}
+
+
+def _thesis_score(t) -> int:
+    conviction = (t.conviction or "").lower()
+    conviction_score = {"high": 3, "medium": 2, "low": 1}.get(conviction, 1)
+    risk_penalty = {"high": 3, "medium": 1, "low": 0}.get(
+        (t.big_company_risk or "").lower(), 1
+    )
+    return conviction_score * 3 + t.niche_score + t.boring_score - risk_penalty
+
+
+def _passes_boring_niche_tests(t) -> bool:
+    risk = (t.big_company_risk or "").lower()
+    if not t.is_product:
+        return False
+    if risk == "high":
+        return False
+    if t.niche_score < 3:
+        return False
+    return True
+
+
+def _filter_and_rank_theses(theses):
+    kept, dropped = [], []
+    for t in theses:
+        (kept if _passes_boring_niche_tests(t) else dropped).append(t)
+    for t in dropped:
+        print(
+            "  - dropped thesis: "
+            f"{t.title} (big_company_risk={t.big_company_risk}, "
+            f"niche={t.niche_score}, boring={t.boring_score}, product={t.is_product})"
+        )
+    kept.sort(key=_thesis_score, reverse=True)
+    print(f"  - final theses kept after boring/niche tests: {len(kept)}")
+    return kept
 
 
 def generate_daily_brief(state: RadarState) -> RadarState:
