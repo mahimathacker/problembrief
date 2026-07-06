@@ -158,6 +158,7 @@ REDDIT_WEB_QUERIES = [
 ]
 REDDIT_WEB_PER_DAY = int(os.getenv("RADAR_REDDIT_WEB_PER_DAY", "3"))
 REDDIT_WEB_RESULTS_PER_QUERY = int(os.getenv("RADAR_REDDIT_WEB_RESULTS_PER_QUERY", "5"))
+REDDIT_WEB_RECENCY_MONTHS = int(os.getenv("RADAR_REDDIT_WEB_RECENCY_MONTHS", "18"))
 
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.

@@ -62,6 +62,25 @@ def _looks_like_pain_article(title: str, description: str) -> bool:
     return bool(_PAIN_SIGNAL_RE.search(text))
 
 
+def _stale_reddit_result(title: str, content: str) -> bool:
+    """Best-effort filter for old Reddit search results from web snippets."""
+    text = f"{title} {content}".lower()
+    max_months = config.REDDIT_WEB_RECENCY_MONTHS
+
+    for n in re.findall(r"\b(\d+)\s*(?:y|yr|yrs|year|years)\s+ago\b", text):
+        if int(n) * 12 > max_months:
+            return True
+    for n in re.findall(r"\b(\d+)\s*(?:mo|mos|month|months)\s+ago\b", text):
+        if int(n) > max_months:
+            return True
+
+    cutoff_year = (date.today() - timedelta(days=max_months * 31)).year
+    years = [int(y) for y in re.findall(r"\b(20\d{2})\b", text)]
+    if years and max(years) < cutoff_year:
+        return True
+    return False
+
+
 def _append_comments(item: SourceItem, comments: list[str]) -> None:
     """Fold a thread's top comments into the item's text (capped to bound tokens)."""
     if comments:
@@ -307,14 +326,19 @@ def fetch_reddit_web_pain(limit: int) -> list[SourceItem]:
     queries = _daily_rotation(config.REDDIT_WEB_QUERIES, config.REDDIT_WEB_PER_DAY)
     items: list[SourceItem] = []
     seen: set[str] = set()
+    cutoff = (date.today() - timedelta(days=config.REDDIT_WEB_RECENCY_MONTHS * 31)).isoformat()
     for q in queries:
-        data = enrich._search(q, max_results=config.REDDIT_WEB_RESULTS_PER_QUERY)
+        q_recent = f"{q} after:{cutoff}"
+        data = enrich._search(q_recent, max_results=config.REDDIT_WEB_RESULTS_PER_QUERY)
         for res in data.get("results", []):
             url = res.get("url", "")
             title = res.get("title", "")
+            content = res.get("content", "")
             if not title or url in seen:
                 continue
             if "reddit.com/r/" not in url.lower():
+                continue
+            if _stale_reddit_result(title, content):
                 continue
             seen.add(url)
             items.append(
@@ -324,8 +348,8 @@ def fetch_reddit_web_pain(limit: int) -> list[SourceItem]:
                     title=title,
                     text=(
                         "Public Reddit web-search result. "
-                        f"Discovery query: {q}\n"
-                        f"Snippet: {_clean(res.get('content'), 1500)}"
+                        f"Discovery query: {q_recent}\n"
+                        f"Snippet: {_clean(content, 1500)}"
                     ),
                     url=url,
                 )
