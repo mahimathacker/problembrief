@@ -130,6 +130,16 @@ def _passes_boring_niche_tests(t) -> bool:
     return True
 
 
+def _fallback_research_lead(t) -> bool:
+    """Keep a few low-confidence leads when the strict buildable bar finds nothing."""
+    conviction = (t.conviction or "").lower()
+    if t.niche_score < 3:
+        return False
+    if t.boring_score < 3:
+        return False
+    return conviction in {"low", "medium", "high"}
+
+
 def _filter_and_rank_theses(theses):
     kept, dropped = [], []
     for t in theses:
@@ -141,6 +151,12 @@ def _filter_and_rank_theses(theses):
             f"niche={t.niche_score}, boring={t.boring_score}, product={t.is_product})"
         )
     kept.sort(key=_thesis_score, reverse=True)
+    if not kept and theses:
+        fallback = [t for t in theses if _fallback_research_lead(t)]
+        fallback.sort(key=_thesis_score, reverse=True)
+        kept = fallback[: min(3, len(fallback))]
+        if kept:
+            print(f"  - strict gate kept 0; keeping {len(kept)} research leads")
     print(f"  - final theses kept after boring/niche tests: {len(kept)}")
     return kept
 

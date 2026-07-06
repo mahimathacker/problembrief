@@ -220,13 +220,15 @@ Core judgment — WHO is the competition? A market crowded with small, focused s
 that charge money is a GREEN FLAG: demand is validated and you can win with a sharp \
 angle (like Tavily/Exa in search APIs). But if a BIG company — OpenAI, Anthropic, \
 Google, Microsoft, GitHub, AWS, Notion, and the like — or the dominant existing tool \
-could add this as a feature, or already does the job ~80%, that is a RED FLAG: if they \
-do 80% today they will do 100% in their next release, and a small team cannot win.
+already solves the SAME workflow for the SAME buyer, or can add the exact missing piece \
+as a normal next feature, that is a RED FLAG.
 
 Three tests that DECIDE conviction:
-1. Big-company test: could a big platform or the leading existing tool just add this as \
-a feature? If yes → conviction LOW. (Most flashy AI-infra ideas fail this — everyone \
-chases them and the model vendors absorb them.)
+1. Big-company test: could a big platform or the leading existing tool add the EXACT \
+workflow for the SAME narrow buyer as a simple feature? If yes → conviction LOW. But \
+do NOT mark risk high just because big companies exist nearby. If the idea needs niche \
+workflow knowledge, messy integrations, setup, compliance, service work, or a buyer the \
+big tool does not focus on, risk is medium or low.
 2. Niche-depth test: the best ideas serve a SMALL, SPECIFIC group you can't split \
 further — "independent physiotherapy clinics", not "healthcare"; "furniture Shopify \
 stores", not "e-commerce". Broad ideas ("all developers", "all SaaS teams") are weak.
@@ -240,23 +242,27 @@ companies" instead of "incumbents". Write so a smart non-native English speaker 
 - Ground every claim in the provided web context. Do NOT invent competitors or pricing. \
 If the context is thin, say so and lower conviction — don't bluff.
 - Be honest about feature-vs-product: if the fix obviously belongs inside one existing \
-tool, set is_product=false and lower conviction.
+tool, set is_product=false and lower conviction. But set is_product=true when a small \
+team could sell it as a focused workflow for a narrow group, even if bigger tools cover \
+part of the job.
 - If the context shows pricing or adoption numbers, CITE them in what_exists / \
 demand_signal (e.g. "Portkey ~$49/mo", "Kafka is the default backbone"). If pricing \
 truly isn't there, say "pricing unclear" in three words — don't write a long disclaimer.
 - conviction: HIGH only if it passes all three tests above — a small specific niche, a \
 boring/defensible problem, and NOT something a big company can just add. MEDIUM = real \
-but broad or partly absorbable. LOW = a big company will likely add it, it's a feature \
-not a product, the market is dominated by giants, or the niche is too broad. BE STRICT: \
-if the biggest risk is "a big company can add this", conviction CANNOT be high — cap it \
-at medium, usually low. Spread conviction honestly; don't default everything to medium.
+but broad, partly absorbable, or needs validation. LOW = a big company will likely add \
+the exact workflow, it's a feature not a product, the market is dominated by giants for \
+the same buyer, or the niche is too broad. BE STRICT, but do not default every researched \
+lead to low. A niche boring problem with paying tools nearby is usually medium or high, \
+not low.
 - biggest_risk must be the honest main reason THIS specific idea fails — vary it, and \
 name the specific big company or tool that would absorb it when that's the real risk.
 - Set big_company_risk explicitly:
-  low = hard for a big platform to absorb because it needs niche workflow/service work.
+  low = hard for a big platform to absorb because it needs niche workflow, messy setup, \
+service work, local context, or a buyer the platform ignores.
   medium = a big tool could add part of it, but niche execution still matters.
   high = Microsoft/GitHub/AWS/Google/OpenAI/Anthropic/Notion/etc. or the dominant tool \
-could add it as a feature.
+already serves the same buyer and could add the exact workflow as a normal feature.
 - Set niche_score 1-5. 5 means a tiny concrete ICP like "small law firms with 5-30 \
 staff doing billable time cleanup", not "developers" or "all security teams".
 - Set boring_score 1-5. 5 means dull service-like operational work; 1 means trendy AI \
@@ -379,6 +385,7 @@ _SITE = {
     "lobsters": "Lobsters",
     "devto": "Dev.to",
     "github": "GitHub",
+    "reddit_web": "Reddit",
     "web": "Web",
 }
 
@@ -408,17 +415,22 @@ def write_brief(
     payload = json.dumps(payload_objs, indent=2)
 
     user = f"""Date: {date_str}
-Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, and GitHub, then researched \
-the top leads on the live web.
+Scanned {item_count} posts from Hacker News, Lobsters, Dev.to, GitHub, Reddit web \
+results, and the wider web, then researched the top leads on the live web.
 
 Buildability theses (each already grounded in web research):
 
 {payload}
 
 Write the brief in Markdown:
-1. '## TL;DR' — 2-3 sentences on the strongest buildable idea today and why. If there are \
-zero theses, say the day was thin and stop.
-2. '## Buildable Ideas' — one '### <title>' entry per thesis, in this exact line order:
+1. '## TL;DR' — 2-3 sentences on the strongest buildable idea today and why. If all \
+theses are low-confidence, not standalone products, or high big-company risk, say there \
+were no proven buildable ideas but there are research leads worth checking.
+2. If there are theses with `is_product=true`, `big_company_risk` not high, and \
+`conviction` high or medium, write '## Buildable Ideas' for those first.
+3. For the remaining theses, write '## Research Leads' and make it clear they need \
+validation before building.
+For each thesis in either section, use one '### <title>' entry in this exact line order:
    `**Category:**` the `category` value written nicely — replace underscores with a space \
 and capitalize (e.g. "small_business" → "Small business", "ai_agents" → "AI agents").
    `**Problem:**` the pain in one simple line.
@@ -437,5 +449,6 @@ the risk is medium/high.
 line on the biggest reason it could fail.
    `**Sources:**` Markdown links built ONLY from `sources` — use each entry's `site` as \
 the link text and its `url` as the target, copied verbatim. Omit if `sources` is empty.
+If there are zero theses, write only TL;DR and say the day was thin.
 Keep it short and easy to read. Most confident ideas first. Never invent a URL."""
     return _complete(_BRIEF_SYS, user, 8000)
