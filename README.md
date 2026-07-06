@@ -1,14 +1,67 @@
 # Problembrief
 
-Study real developer problems, every morning.
+Find real problems worth solving, every morning.
 
-A daily research agent that scans developer communities, extracts repeated **pain
-points**, scores them as buildable opportunities, and writes you a founder/builder
-brief in Markdown.
+Problembrief is a private research agent for builders. It scans public discussion
+sources, extracts repeated **pain points**, checks whether they look like buildable
+opportunities, and writes a structured founder/builder brief in Markdown.
+
+The goal is simple: help a builder find real problems from public signals instead of
+starting from random ideas.
 
 This is **V1 — the thinnest useful slice**: fetch → extract → dedupe → score → brief
 to a file. No database, no dashboard yet. Get a brief you'd actually read first; widen
 from there.
+
+## Responsible Data Use
+
+Problembrief is designed for low-volume research summaries, not bulk collection or
+republication.
+
+- It reads selected public sources only.
+- It keeps brief metadata such as title, URL, source, score/comment counts, and short
+  excerpts or summaries when needed for evidence.
+- It links back to original sources instead of copying full posts or comments.
+- It does not post, comment, vote, message users, or automate actions on community
+  platforms.
+- It does not collect private user data.
+- It does not build user profiles.
+- It does not store full community datasets.
+- It does not use source content to train or fine-tune AI models.
+
+The output is a private research brief for product discovery. A typical result might
+summarize a repeated pain such as "small businesses manually chase unpaid invoices" or
+"developers struggle to test webhook traffic before launch," then include affected
+users, possible existing tools, a first-build idea, confidence, and source links.
+
+## Reddit API Use
+
+Problembrief may use Reddit's Data API only for selected public subreddits and only at
+low volume. Reddit data would be one source among others, not the whole product.
+
+When Reddit is enabled, the app reads public posts and public comments from a small set
+of chosen communities such as SaaS, startups, small business, developer tools, AI, or
+operations communities. It collects limited public metadata:
+
+- post title
+- post URL
+- subreddit name
+- score and comment count
+- short excerpts or summaries from relevant public comments
+
+It then groups recurring problems into private research briefs. For example:
+
+- If several posts in `r/SaaS` or `r/startups` discuss failed onboarding, confusing
+  pricing, or poor trial conversion, Problembrief may summarize that as a go-to-market
+  or product problem.
+- If posts in `r/smallbusiness` mention chasing unpaid invoices, manual bookings, or
+  missed customer follow-ups, it may summarize that as a small-business workflow pain.
+- If posts in `r/webdev`, `r/devops`, or `r/programming` mention webhook testing,
+  flaky tests, deployment errors, or API integration issues, it may classify that as a
+  developer workflow problem.
+
+Problembrief does not interact with Reddit users. It does not create Reddit posts,
+leave comments, vote, send messages, moderate communities, or mirror Reddit content.
 
 ## Pipeline (LangGraph)
 
@@ -22,6 +75,11 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
     gripes about *existing products*, not launch headlines.
   - **Lobsters** (`hottest.json`) and **Dev.to** (`/api/articles`).
   - **GitHub Issues** (Search API) — recent issues (last ~30 days) matching pain queries.
+  - **Web discovery** — optional search-backed discovery across small business,
+    vertical SaaS, ecommerce, security, AI, developer tools, and other categories.
+  - **Reddit** — planned optional source, subject to Reddit API approval and platform
+    terms. It will be low-volume and limited to public posts/comments from selected
+    subreddits.
   - The HN phrases and GitHub queries are **rotated daily** from a larger pool, so the
     brief stops circling the same topics. The busiest HN + GitHub threads are enriched
     with their **top comments**, where the real pain shows. A **cross-run dedup** then
