@@ -130,6 +130,25 @@ DISCOVERY_QUERIES = [
 ]
 DISCOVERY_PER_DAY = int(os.getenv("RADAR_DISCOVERY_PER_DAY", "5"))
 
+# Reddit via public web search, not the Reddit API. This is a temporary discovery
+# source while API access is pending. Keep it narrow, pain-oriented, and low-volume.
+REDDIT_WEB_QUERIES = [
+    q.strip()
+    for q in os.getenv(
+        "RADAR_REDDIT_WEB_QUERIES",
+        ";".join(
+            [
+                "site:reddit.com/r/smallbusiness frustrated software",
+                'site:reddit.com/r/SaaS "is there a tool"',
+                'site:reddit.com/r/webdev "I hate"',
+            ]
+        ),
+    ).split(";")
+    if q.strip()
+]
+REDDIT_WEB_PER_DAY = int(os.getenv("RADAR_REDDIT_WEB_PER_DAY", "3"))
+REDDIT_WEB_RESULTS_PER_QUERY = int(os.getenv("RADAR_REDDIT_WEB_RESULTS_PER_QUERY", "5"))
+
 # --- Personalization -----------------------------------------------------
 # Used to bias the "personal_interest" score and the brief's framing.
 INTERESTS = [

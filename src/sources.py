@@ -292,6 +292,49 @@ def fetch_github(queries: list[str], limit: int, token: str = "") -> list[Source
 
 # --- Web discovery (beyond dev forums) -----------------------------------
 
+def fetch_reddit_web_pain(limit: int) -> list[SourceItem]:
+    """Discover public Reddit pain signals through Tavily web search.
+
+    This does not use the Reddit API, does not log in, and does not interact with
+    Reddit. It only reads public web search snippets/pages for narrow, pain-oriented
+    queries while API access is pending.
+    """
+    if not config.TAVILY_API_KEY:
+        print("  - reddit_web: skipped (set TAVILY_API_KEY to search public Reddit pages)")
+        return []
+    from src import enrich  # lazy import; enrich only depends on config
+
+    queries = _daily_rotation(config.REDDIT_WEB_QUERIES, config.REDDIT_WEB_PER_DAY)
+    items: list[SourceItem] = []
+    seen: set[str] = set()
+    for q in queries:
+        data = enrich._search(q, max_results=config.REDDIT_WEB_RESULTS_PER_QUERY)
+        for res in data.get("results", []):
+            url = res.get("url", "")
+            title = res.get("title", "")
+            if not title or url in seen:
+                continue
+            if "reddit.com/r/" not in url.lower():
+                continue
+            seen.add(url)
+            items.append(
+                SourceItem(
+                    id=f"reddit-web-{len(items)}",
+                    source="reddit_web",
+                    title=title,
+                    text=(
+                        "Public Reddit web-search result. "
+                        f"Discovery query: {q}\n"
+                        f"Snippet: {_clean(res.get('content'), 1500)}"
+                    ),
+                    url=url,
+                )
+            )
+            if len(items) >= limit:
+                return items
+    return items
+
+
 def fetch_web_pain(limit: int) -> list[SourceItem]:
     """Discover real-world pain OUTSIDE dev forums — normal businesses and non-AI
     tech — via rotating Tavily web searches, so the brief isn't all AI-infra.
@@ -340,6 +383,7 @@ def fetch_all() -> list[SourceItem]:
             config.MAX_PER_SOURCE,
             config.GITHUB_TOKEN,
         )),
+        ("reddit_web", lambda: fetch_reddit_web_pain(config.MAX_PER_SOURCE)),
         ("web", lambda: fetch_web_pain(config.MAX_PER_SOURCE)),
     ):
         try:

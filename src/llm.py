@@ -117,6 +117,11 @@ evidence — agreement, "me too", described workarounds, and "is there a way to�
 signal real, shared pain.
 - Some items are web articles describing an industry's problems. Extract the real \
 underlying pain they describe; don't reject an item just because it's an article.
+- Some items may be public Reddit web-search results (`source=reddit_web`). Treat them \
+as noisy but valuable complaint signals. Be strict: extract them only when the post \
+shows a specific user, a real job-to-be-done, a repeated/manual workaround, money/time \
+lost, switching intent, or a clear "is there a tool for X" need. Do NOT turn one vague \
+rant, meme, preference, or generic "I hate X" into an opportunity.
 - IMPORTANT: do NOT let AI/infra/dev-tooling topics crowd out everything else. Actively \
 pull problems from OTHER categories too — normal businesses, and other tech areas (web, \
 mobile, data, fintech, e-commerce, healthcare, marketing). Variety across categories is \

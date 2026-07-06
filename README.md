@@ -77,6 +77,11 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
   - **GitHub Issues** (Search API) — recent issues (last ~30 days) matching pain queries.
   - **Web discovery** — optional search-backed discovery across small business,
     vertical SaaS, ecommerce, security, AI, developer tools, and other categories.
+  - **Reddit web discovery** — optional Tavily searches for narrow public Reddit pain
+    signals, such as `site:reddit.com/r/smallbusiness frustrated software`,
+    `site:reddit.com/r/SaaS "is there a tool"`, and
+    `site:reddit.com/r/webdev "I hate"`. This is public web search, not Reddit API
+    access, and is used only for low-volume research summaries.
   - **Reddit** — planned optional source, subject to Reddit API approval and platform
     terms. It will be low-volume and limited to public posts/comments from selected
     subreddits.
@@ -126,6 +131,9 @@ Everything tunable lives in `config.py` (override via `.env`):
 - `RADAR_GITHUB_RECENCY_DAYS` — only pull GitHub issues created in the last N days (default 30)
 - `RADAR_DEDUP_DAYS` — don't resurface a problem within N days (default 7)
 - `RADAR_ENRICH_TOP_N` — max leads to research and include (default 8; fewer when the day is thin)
+- `RADAR_REDDIT_WEB_QUERIES` — semicolon-separated public Reddit web-search queries
+- `RADAR_REDDIT_WEB_PER_DAY` — how many Reddit web queries to run daily
+- `RADAR_REDDIT_WEB_RESULTS_PER_QUERY` — max Tavily results per Reddit web query
 - `RADAR_TOP_N` — legacy top-opportunity limit
 - `WEIGHTS` — composite-score weighting (edit in `config.py`)
 
