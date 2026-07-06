@@ -93,12 +93,45 @@ def _select_diverse(leads, n, per_category=2):
     return chosen
 
 
+def _lead_sources(lead, id_to_source):
+    return {id_to_source.get(sid, "") for sid in lead.source_ids}
+
+
+def _ensure_source_slot(chosen, leads, source, id_to_source, limit):
+    """Reserve one enrichment slot for an important source if it produced a real lead."""
+    if not leads or not any(source in _lead_sources(o, id_to_source) for o in leads):
+        return chosen
+    if any(source in _lead_sources(o, id_to_source) for o in chosen):
+        return chosen
+
+    source_leads = [o for o in leads if source in _lead_sources(o, id_to_source)]
+    if not source_leads:
+        return chosen
+    pick = source_leads[0]
+    if pick in chosen:
+        return chosen
+    if len(chosen) < limit:
+        chosen.append(pick)
+    else:
+        chosen[-1] = pick
+    return chosen
+
+
 def enrich_leads(state: RadarState) -> RadarState:
-    leads = _select_diverse(state.get("deduped", []), config.ENRICH_TOP_N)
+    raw = state.get("raw_items", [])
+    id_to_source = {it.id: it.source for it in raw}
+    all_leads = state.get("deduped", [])
+    leads = _select_diverse(all_leads, config.ENRICH_TOP_N)
+    leads = _ensure_source_slot(leads, all_leads, "reddit_web", id_to_source, config.ENRICH_TOP_N)
     print(f"[4/6] enriching {len(leads)} leads with live market research…")
     if leads:
         cats = ", ".join(o.category or "other" for o in leads)
         print(f"  - selected categories: {cats}")
+        source_names = [
+            "+".join(sorted(s for s in _lead_sources(o, id_to_source) if s)) or "unknown"
+            for o in leads
+        ]
+        print(f"  - selected sources: {', '.join(source_names)}")
     theses = []
     for lead in leads:
         context = enrich.market_context(lead.summary)

@@ -102,6 +102,12 @@ def _render_items(items: list[SourceItem]) -> str:
     return "\n\n".join(lines)
 
 
+def _source_from_id(source_id: str) -> str:
+    if source_id.startswith("reddit-web-"):
+        return "reddit_web"
+    return source_id.split("-", 1)[0]
+
+
 # --- 1. extract ----------------------------------------------------------
 
 _EXTRACT_SYS = f"""You analyze posts, comment threads, AND web articles — from developer \
@@ -185,6 +191,10 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
     from collections import Counter
 
     print(f"  - extracted by category: {dict(Counter(p.category for p in out))}")
+    print(
+        "  - extracted by source: "
+        f"{dict(Counter(_source_from_id(sid) for p in out for sid in p.source_ids))}"
+    )
     for p in out:
         print(f"      [{p.category}] pain{p.pain} mkt{p.market_signal} build{p.buildability} · {p.summary}")
     return out

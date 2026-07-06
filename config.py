@@ -139,8 +139,18 @@ REDDIT_WEB_QUERIES = [
         ";".join(
             [
                 "site:reddit.com/r/smallbusiness frustrated software",
+                'site:reddit.com/r/smallbusiness "does anyone know a tool"',
+                'site:reddit.com/r/smallbusiness "manual" "software"',
+                'site:reddit.com/r/smallbusiness "wish there was"',
                 'site:reddit.com/r/SaaS "is there a tool"',
+                'site:reddit.com/r/SaaS "manual process"',
+                'site:reddit.com/r/SaaS "frustrated with"',
+                'site:reddit.com/r/startups "what tool"',
                 'site:reddit.com/r/webdev "I hate"',
+                'site:reddit.com/r/webdev "is there a way to"',
+                'site:reddit.com/r/webdev "frustrated with"',
+                'site:reddit.com/r/devops "is there a tool"',
+                'site:reddit.com/r/freelance "client" "software"',
             ]
         ),
     ).split(";")
