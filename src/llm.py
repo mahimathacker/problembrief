@@ -108,7 +108,42 @@ def _json_from_text(text: str):
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
+    first_obj = text.find("{")
+    first_arr = text.find("[")
+    starts = [i for i in (first_obj, first_arr) if i >= 0]
+    if starts:
+        start = min(starts)
+        end = max(text.rfind("}"), text.rfind("]"))
+        if end > start:
+            text = text[start : end + 1]
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+    text = re.sub(r"\bNaN\b|\bInfinity\b|-Infinity", "null", text)
     return json.loads(text)
+
+
+def _parse_gemini(system: str, user: str, schema, max_tokens: int):
+    schema_json = json.dumps(schema.model_json_schema(), separators=(",", ":"))
+    prompt = (
+        f"{user}\n\n"
+        "Return ONLY strict valid JSON. No markdown. No comments. No ellipses. "
+        "Use double quotes for every key and string. Do not use NaN or Infinity. "
+        f"Match this JSON schema exactly:\n{schema_json}"
+    )
+    last_error = None
+    for attempt in range(2):
+        text = _gemini_generate(system, prompt, max_tokens, json_mode=True)
+        try:
+            return schema.model_validate(_json_from_text(text))
+        except Exception as e:
+            last_error = e
+            print(f"  ! gemini returned invalid JSON; retrying ({attempt + 1}/2): {e}")
+            prompt = (
+                f"{user}\n\n"
+                "Your previous response was invalid JSON. Return ONLY a compact JSON object "
+                "matching the schema. No prose, no markdown, no truncation, no trailing commas.\n"
+                f"Schema:\n{schema_json}"
+            )
+    raise last_error
 
 
 def _parse(system: str, user: str, schema, max_tokens: int):
@@ -126,14 +161,7 @@ def _parse(system: str, user: str, schema, max_tokens: int):
         )
         return completion.choices[0].message.parsed
     if config.PROVIDER == "gemini":
-        schema_json = json.dumps(schema.model_json_schema(), indent=2)
-        text = _gemini_generate(
-            system,
-            f"{user}\n\nReturn ONLY valid JSON matching this schema:\n{schema_json}",
-            max_tokens,
-            json_mode=True,
-        )
-        return schema.model_validate(_json_from_text(text))
+        return _parse_gemini(system, user, schema, max_tokens)
     resp = _anthropic().messages.parse(
         model=config.MODEL,
         max_tokens=max_tokens,
@@ -434,7 +462,8 @@ def dedupe(
     Market validation happens later, in the enrichment step — not here."""
     if not pain_points:
         return []
-    ranked = sorted(pain_points, key=_composite, reverse=True)[: config.MAX_PAIN_POINTS]
+    cap = config.GEMINI_MAX_PAIN_POINTS if config.PROVIDER == "gemini" else config.MAX_PAIN_POINTS
+    ranked = sorted(pain_points, key=_composite, reverse=True)[:cap]
     payload = json.dumps([p.model_dump() for p in ranked])
     parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 16000)
     opps = parsed.opportunities if parsed else []

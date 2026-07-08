@@ -232,6 +232,7 @@ WEIGHTS = {
 # Cap how many (highest-scoring) pain points get sent to the dedupe step. Keeps the
 # model's output under its token budget and focuses on the strongest signals.
 MAX_PAIN_POINTS = int(os.getenv("RADAR_MAX_PAIN_POINTS", "40"))
+GEMINI_MAX_PAIN_POINTS = int(os.getenv("RADAR_GEMINI_MAX_PAIN_POINTS", "30"))
 
 # How many opportunities make the brief.
 TOP_N = int(os.getenv("RADAR_TOP_N", "5"))
