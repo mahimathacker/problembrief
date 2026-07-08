@@ -108,9 +108,13 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
   both are committed back to the repo — a lightweight, service-free "database".
 
 Extraction/scoring quality is the whole point, so it defaults to **Claude Opus 4.8**
-with structured outputs. To switch backends when you're low on credits, set
-`RADAR_PROVIDER=openai` and `OPENAI_API_KEY` (optionally `RADAR_OPENAI_MODEL`, default
-`gpt-5.5`) — the pipeline is provider-agnostic.
+with structured outputs. The pipeline is provider-agnostic:
+
+- Anthropic: `RADAR_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, optional `RADAR_MODEL`
+- OpenAI: `RADAR_PROVIDER=openai`, `OPENAI_API_KEY`, optional `RADAR_OPENAI_MODEL`
+- Gemini: `RADAR_PROVIDER=gemini`, `GEMINI_API_KEY`, optional `RADAR_GEMINI_MODEL`
+
+Gemini uses Google's REST API through `httpx`, so no extra SDK dependency is required.
 
 ## Setup
 

@@ -14,9 +14,14 @@ from src.graph import build_graph
 def main() -> int:
     if config.PROVIDER == "openai":
         if not os.getenv("OPENAI_API_KEY"):
-            print("ERROR: set OPENAI_API_KEY (or use RADAR_PROVIDER=anthropic).")
+            print("ERROR: set OPENAI_API_KEY (or use RADAR_PROVIDER=anthropic/gemini).")
             return 1
         active_model = config.OPENAI_MODEL
+    elif config.PROVIDER == "gemini":
+        if not os.getenv("GEMINI_API_KEY"):
+            print("ERROR: set GEMINI_API_KEY (or use RADAR_PROVIDER=anthropic/openai).")
+            return 1
+        active_model = config.GEMINI_MODEL
     else:
         if not os.getenv("ANTHROPIC_API_KEY"):
             print("ERROR: set ANTHROPIC_API_KEY (copy .env.example to .env).")

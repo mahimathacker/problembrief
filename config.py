@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Provider & model ----------------------------------------------------
-# Backend LLM: "anthropic" (default) or "openai". Switch with RADAR_PROVIDER=openai
-# when you're low on one provider's credits.
+# Backend LLM: "anthropic" (default), "openai", or "gemini". Switch providers when
+# you're low on one provider's credits.
 PROVIDER = os.getenv("RADAR_PROVIDER", "anthropic").lower()
 
 # Anthropic model (used when PROVIDER=anthropic). Quality is the whole point, so
@@ -20,6 +20,11 @@ MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8")
 # OpenAI model + key (used when RADAR_PROVIDER=openai).
 OPENAI_MODEL = os.getenv("RADAR_OPENAI_MODEL", "gpt-5.5")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+# Gemini model + key (used when RADAR_PROVIDER=gemini). Uses Google's REST API via
+# httpx, so no separate SDK is required.
+GEMINI_MODEL = os.getenv("RADAR_GEMINI_MODEL", "gemini-2.5-pro")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # --- Sources -------------------------------------------------------------
 # How many items to pull from each source (HN, Lobsters, Dev.to, GitHub).

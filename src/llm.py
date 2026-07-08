@@ -1,10 +1,11 @@
 """All LLM calls: extract pain points, dedupe into opportunities, write brief.
 
-Provider-agnostic — set RADAR_PROVIDER=anthropic (default) or openai.
+Provider-agnostic — set RADAR_PROVIDER=anthropic (default), openai, or gemini.
 """
 from __future__ import annotations
 
 import json
+import re
 
 import config
 from src.schema import Deduped, Extraction, MarketThesis, Opportunity, PainPoint, SourceItem
@@ -42,6 +43,53 @@ def _openai_temperature_kwargs() -> dict:
     return {"temperature": 0}
 
 
+def _gemini_generate(system: str, user: str, max_tokens: int, *, json_mode: bool = False) -> str:
+    """Gemini REST call. Keeps us from needing another SDK dependency."""
+    if not config.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is required when RADAR_PROVIDER=gemini")
+
+    import httpx
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/"
+        f"models/{config.GEMINI_MODEL}:generateContent"
+    )
+    generation_config = {
+        "temperature": 0,
+        "maxOutputTokens": max_tokens,
+    }
+    if json_mode:
+        generation_config["responseMimeType"] = "application/json"
+
+    r = httpx.post(
+        url,
+        params={"key": config.GEMINI_API_KEY},
+        json={
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": generation_config,
+        },
+        timeout=120,
+    )
+    r.raise_for_status()
+    data = r.json()
+    parts = (
+        data.get("candidates", [{}])[0]
+        .get("content", {})
+        .get("parts", [])
+    )
+    return "".join(p.get("text", "") for p in parts).strip()
+
+
+def _json_from_text(text: str):
+    """Parse JSON, tolerating fenced blocks if a model returns them."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    return json.loads(text)
+
+
 def _parse(system: str, user: str, schema, max_tokens: int):
     """Structured output → a validated pydantic object (or None)."""
     if config.PROVIDER == "openai":
@@ -56,6 +104,15 @@ def _parse(system: str, user: str, schema, max_tokens: int):
             response_format=schema,
         )
         return completion.choices[0].message.parsed
+    if config.PROVIDER == "gemini":
+        schema_json = json.dumps(schema.model_json_schema(), indent=2)
+        text = _gemini_generate(
+            system,
+            f"{user}\n\nReturn ONLY valid JSON matching this schema:\n{schema_json}",
+            max_tokens,
+            json_mode=True,
+        )
+        return schema.model_validate(_json_from_text(text))
     resp = _anthropic().messages.parse(
         model=config.MODEL,
         max_tokens=max_tokens,
@@ -80,6 +137,8 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
             ],
         )
         return completion.choices[0].message.content or ""
+    if config.PROVIDER == "gemini":
+        return _gemini_generate(system, user, max_tokens)
     msg = _anthropic().messages.create(
         model=config.MODEL,
         max_tokens=max_tokens,
