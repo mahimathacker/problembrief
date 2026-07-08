@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 
 import config
 from src.schema import Deduped, Extraction, MarketThesis, Opportunity, PainPoint, SourceItem
@@ -61,16 +62,36 @@ def _gemini_generate(system: str, user: str, max_tokens: int, *, json_mode: bool
     if json_mode:
         generation_config["responseMimeType"] = "application/json"
 
-    r = httpx.post(
-        url,
-        params={"key": config.GEMINI_API_KEY},
-        json={
-            "systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": user}]}],
-            "generationConfig": generation_config,
-        },
-        timeout=120,
-    )
+    payload = {
+        "systemInstruction": {"parts": [{"text": system}]},
+        "contents": [{"role": "user", "parts": [{"text": user}]}],
+        "generationConfig": generation_config,
+    }
+    last_error = None
+    for attempt in range(4):
+        r = httpx.post(
+            url,
+            params={"key": config.GEMINI_API_KEY},
+            json=payload,
+            timeout=120,
+        )
+        if r.status_code != 429:
+            r.raise_for_status()
+            break
+
+        last_error = r
+        retry_after = r.headers.get("retry-after")
+        if retry_after and retry_after.isdigit():
+            delay = int(retry_after)
+        else:
+            delay = 8 * (attempt + 1)
+        print(f"  ! gemini rate limited; retrying in {delay}s (attempt {attempt + 1}/4)")
+        time.sleep(delay)
+    else:
+        assert last_error is not None
+        last_error.raise_for_status()
+
+    time.sleep(1.2)
     r.raise_for_status()
     data = r.json()
     parts = (

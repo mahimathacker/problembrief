@@ -115,6 +115,9 @@ with structured outputs. The pipeline is provider-agnostic:
 - Gemini: `RADAR_PROVIDER=gemini`, `GEMINI_API_KEY`, optional `RADAR_GEMINI_MODEL`
 
 Gemini uses Google's REST API through `httpx`, so no extra SDK dependency is required.
+The default Gemini model is `gemini-2.5-flash` because scheduled runs make many LLM
+calls and Pro-tier models can hit `429 Too Many Requests` quickly. Use
+`gemini-2.5-pro` only when you have enough quota and want a higher-quality manual run.
 
 ## Setup
 

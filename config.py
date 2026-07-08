@@ -23,7 +23,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # Gemini model + key (used when RADAR_PROVIDER=gemini). Uses Google's REST API via
 # httpx, so no separate SDK is required.
-GEMINI_MODEL = os.getenv("RADAR_GEMINI_MODEL", "gemini-2.5-pro")
+GEMINI_MODEL = os.getenv("RADAR_GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # --- Sources -------------------------------------------------------------
