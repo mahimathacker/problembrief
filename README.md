@@ -9,6 +9,12 @@ opportunities, and writes a structured founder/builder brief in Markdown.
 The goal is simple: help a builder find real problems from public signals instead of
 starting from random ideas.
 
+Problembrief can scan developer pain, but it is not only a developer-tool radar. It also
+looks for everyday-user problems in reachable groups: tutors and coaching classes, small
+shop owners, local travel agents, creators, students, freelancers, women learning tech,
+small agencies, local service providers, early builders outside big cities, women’s
+health, and general patient/caregiver health workflows.
+
 This is **V1 — the thinnest useful slice**: fetch → extract → dedupe → score → brief
 to a file. No database, no dashboard yet. Get a brief you'd actually read first; widen
 from there.
@@ -76,7 +82,8 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
   - **Lobsters** (`hottest.json`) and **Dev.to** (`/api/articles`).
   - **GitHub Issues** (Search API) — recent issues (last ~30 days) matching pain queries.
   - **Web discovery** — optional search-backed discovery across small business,
-    vertical SaaS, ecommerce, security, AI, developer tools, and other categories.
+    vertical SaaS, ecommerce, education, local services, agencies, women’s health,
+    general health, security, AI, developer tools, and other categories.
   - **Reddit web discovery** — optional Tavily searches for narrow public Reddit pain
     signals, such as `site:reddit.com/r/smallbusiness frustrated software`,
     `site:reddit.com/r/SaaS "is there a tool"`, and

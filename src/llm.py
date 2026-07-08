@@ -115,7 +115,11 @@ communities and the wider web — and extract concrete, buildable PAIN POINTS: r
 frustrations, repeated complaints, or unmet needs someone could turn into a product. \
 The pain can belong to DEVELOPERS, to NORMAL BUSINESSES (restaurants, clinics, shops, \
 agencies, real-estate, logistics, gyms, law firms…), or to EVERYDAY people — all are \
-welcome.
+welcome. Build for broad everyday users only through reachable starting groups: tutors, \
+coaching classes, small shop owners, local travel agents, creators, students, freelancers, \
+women learning tech, small agencies, local service providers, early builders outside big \
+cities, women managing health problems, and patients/caregivers handling everyday health \
+admin.
 
 Reading the input:
 - A post may include a "Top comments:" section. Treat comments as the strongest \
@@ -129,9 +133,21 @@ shows a specific user, a real job-to-be-done, a repeated/manual workaround, mone
 lost, switching intent, or a clear "is there a tool for X" need. Do NOT turn one vague \
 rant, meme, preference, or generic "I hate X" into an opportunity.
 - IMPORTANT: do NOT let AI/infra/dev-tooling topics crowd out everything else. Actively \
-pull problems from OTHER categories too — normal businesses, and other tech areas (web, \
-mobile, data, fintech, e-commerce, healthcare, marketing). Variety across categories is \
-a goal.
+pull problems from OTHER categories too — normal businesses, reachable everyday groups, \
+and other tech areas (web, mobile, data, fintech, e-commerce, healthcare, marketing). \
+Variety across categories is a goal.
+
+Category guidance:
+- Use `womens_health` for patient-facing women-specific health workflows: PCOS/PMOS, \
+endometriosis, periods, fertility, menopause, migraine around hormones, appointment prep, \
+symptom/lab summaries, and being dismissed in care.
+- Use `general_health` for patient/caregiver health admin not specific to women: chronic \
+condition tracking, medication routines, appointment prep, records, caregiver coordination.
+- Use `healthtech` for provider/clinic/admin software, not consumer health.
+- Use `education` for tutors, coaching classes, students, test prep, learning workflows.
+- Use `local_services` for salons, repair shops, home services, local travel agents, gyms, \
+and other local operators.
+- Use `agencies` for small creative/marketing/dev agencies and client-service workflows.
 
 What to extract:
 - Be strict but keep category coverage: return the strongest 2-6 pain points per batch \
