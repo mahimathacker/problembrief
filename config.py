@@ -9,9 +9,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Provider & model ----------------------------------------------------
-# Backend LLM: "anthropic" (default), "openai", or "gemini". Switch providers when
-# you're low on one provider's credits.
+# Backend LLM: "anthropic" (default), "openai", "gemini", or "github_models".
+# Switch providers when you're low on one provider's credits.
 PROVIDER = os.getenv("RADAR_PROVIDER", "anthropic").strip().lower()
+FALLBACK_PROVIDERS = [
+    p.strip().lower()
+    for p in os.getenv("RADAR_FALLBACK_PROVIDERS", "").split(",")
+    if p.strip()
+]
 
 # Anthropic model (used when PROVIDER=anthropic). Quality is the whole point, so
 # default to the most capable Claude model.
@@ -25,6 +30,15 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 # httpx, so no separate SDK is required.
 GEMINI_MODEL = os.getenv("RADAR_GEMINI_MODEL", "gemini-2.5-flash").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+
+# GitHub Models (used when RADAR_PROVIDER=github_models or as a fallback).
+# In GitHub Actions this can use the built-in GITHUB_TOKEN if the workflow grants
+# `models: read`.
+GITHUB_MODELS_MODEL = os.getenv("RADAR_GITHUB_MODEL", "openai/gpt-4o-mini").strip()
+GITHUB_MODELS_TOKEN = (
+    os.getenv("GITHUB_MODELS_TOKEN", "").strip()
+    or os.getenv("GITHUB_TOKEN", "").strip()
+)
 
 # --- Sources -------------------------------------------------------------
 # How many items to pull from each source (HN, Lobsters, Dev.to, GitHub).

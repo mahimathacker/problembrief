@@ -1,10 +1,12 @@
 """All LLM calls: extract pain points, dedupe into opportunities, write brief.
 
-Provider-agnostic — set RADAR_PROVIDER=anthropic (default), openai, or gemini.
+Provider-agnostic — set RADAR_PROVIDER=anthropic (default), openai, gemini, or
+github_models.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 
@@ -17,6 +19,13 @@ _INTERESTS = ", ".join(config.INTERESTS)
 # Clients are created lazily so you only need the key for the provider you use.
 _anthropic_client = None
 _openai_client = None
+
+_PROVIDER_LABELS = {
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "github_models": "GitHub Models",
+}
 
 
 def _anthropic():
@@ -33,7 +42,7 @@ def _openai():
     if _openai_client is None:
         from openai import OpenAI
 
-        _openai_client = OpenAI()
+        _openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
     return _openai_client
 
 
@@ -42,6 +51,95 @@ def _openai_temperature_kwargs() -> dict:
     if config.OPENAI_MODEL.startswith("gpt-5"):
         return {}
     return {"temperature": 0}
+
+
+def _provider_chain() -> list[str]:
+    providers = [config.PROVIDER, *config.FALLBACK_PROVIDERS]
+    out = []
+    for p in providers:
+        if p and p not in out:
+            out.append(p)
+    return out
+
+
+def _provider_has_credentials(provider: str) -> bool:
+    if provider == "openai":
+        return bool(config.OPENAI_API_KEY)
+    if provider == "gemini":
+        return bool(config.GEMINI_API_KEY)
+    if provider == "github_models":
+        return bool(config.GITHUB_MODELS_TOKEN)
+    if provider == "anthropic":
+        return bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
+    return False
+
+
+def _ready_provider_chain() -> list[str]:
+    return [p for p in _provider_chain() if _provider_has_credentials(p)]
+
+
+def _warn_provider_failed(provider: str, err: Exception, fallback: str | None) -> None:
+    label = _PROVIDER_LABELS.get(provider, provider)
+    msg = str(err).replace("\n", " ")
+    if len(msg) > 240:
+        msg = msg[:237] + "..."
+    if fallback:
+        fb_label = _PROVIDER_LABELS.get(fallback, fallback)
+        print(f"  ! {label} failed; trying {fb_label}: {msg}")
+    else:
+        print(f"  ! {label} failed and no fallback remains: {msg}")
+
+
+def _github_models_generate(
+    system: str,
+    user: str,
+    max_tokens: int,
+    *,
+    json_mode: bool = False,
+) -> str:
+    """GitHub Models chat-completions call using the Actions GITHUB_TOKEN/PAT."""
+    if not config.GITHUB_MODELS_TOKEN:
+        raise RuntimeError(
+            "GITHUB_MODELS_TOKEN or GITHUB_TOKEN is required when using GitHub Models"
+        )
+
+    import httpx
+
+    payload = {
+        "model": config.GITHUB_MODELS_MODEL,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": 0,
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {config.GITHUB_MODELS_TOKEN}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json",
+    }
+    r = httpx.post(
+        "https://models.github.ai/inference/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=120,
+    )
+    if json_mode and r.status_code == 400 and "response_format" in payload:
+        payload.pop("response_format", None)
+        r = httpx.post(
+            "https://models.github.ai/inference/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120,
+        )
+    r.raise_for_status()
+    data = r.json()
+    return data["choices"][0]["message"].get("content", "") or ""
 
 
 def _gemini_generate(system: str, user: str, max_tokens: int, *, json_mode: bool = False) -> str:
@@ -121,7 +219,13 @@ def _json_from_text(text: str):
     return json.loads(text)
 
 
-def _parse_gemini(system: str, user: str, schema, max_tokens: int):
+def _parse_json_completion(
+    provider: str,
+    system: str,
+    user: str,
+    schema,
+    max_tokens: int,
+):
     schema_json = json.dumps(schema.model_json_schema(), separators=(",", ":"))
     prompt = (
         f"{user}\n\n"
@@ -131,12 +235,18 @@ def _parse_gemini(system: str, user: str, schema, max_tokens: int):
     )
     last_error = None
     for attempt in range(2):
-        text = _gemini_generate(system, prompt, max_tokens, json_mode=True)
+        if provider == "gemini":
+            text = _gemini_generate(system, prompt, max_tokens, json_mode=True)
+        elif provider == "github_models":
+            text = _github_models_generate(system, prompt, max_tokens, json_mode=True)
+        else:
+            raise ValueError(f"Provider does not use JSON completion parse: {provider!r}")
         try:
             return schema.model_validate(_json_from_text(text))
         except Exception as e:
             last_error = e
-            print(f"  ! gemini returned invalid JSON; retrying ({attempt + 1}/2): {e}")
+            label = _PROVIDER_LABELS.get(provider, provider)
+            print(f"  ! {label} returned invalid JSON; retrying ({attempt + 1}/2): {e}")
             prompt = (
                 f"{user}\n\n"
                 "Your previous response was invalid JSON. Return ONLY a compact JSON object "
@@ -146,9 +256,8 @@ def _parse_gemini(system: str, user: str, schema, max_tokens: int):
     raise last_error
 
 
-def _parse(system: str, user: str, schema, max_tokens: int):
-    """Structured output → a validated pydantic object (or None)."""
-    if config.PROVIDER == "openai":
+def _parse_with_provider(provider: str, system: str, user: str, schema, max_tokens: int):
+    if provider == "openai":
         completion = _openai().beta.chat.completions.parse(
             model=config.OPENAI_MODEL,
             max_completion_tokens=max_tokens,
@@ -160,9 +269,9 @@ def _parse(system: str, user: str, schema, max_tokens: int):
             response_format=schema,
         )
         return completion.choices[0].message.parsed
-    if config.PROVIDER == "gemini":
-        return _parse_gemini(system, user, schema, max_tokens)
-    if config.PROVIDER == "anthropic":
+    if provider in ("gemini", "github_models"):
+        return _parse_json_completion(provider, system, user, schema, max_tokens)
+    if provider == "anthropic":
         resp = _anthropic().messages.parse(
             model=config.MODEL,
             max_tokens=max_tokens,
@@ -172,12 +281,26 @@ def _parse(system: str, user: str, schema, max_tokens: int):
             output_format=schema,
         )
         return resp.parsed_output
-    raise ValueError(f"Unknown RADAR_PROVIDER: {config.PROVIDER!r}")
+    raise ValueError(f"Unknown RADAR_PROVIDER: {provider!r}")
 
 
-def _complete(system: str, user: str, max_tokens: int) -> str:
-    """Plain-text completion."""
-    if config.PROVIDER == "openai":
+def _parse(system: str, user: str, schema, max_tokens: int):
+    """Structured output → a validated pydantic object (or None)."""
+    chain = _ready_provider_chain()
+    if not chain:
+        raise RuntimeError("No configured LLM provider has credentials.")
+    for idx, provider in enumerate(chain):
+        try:
+            return _parse_with_provider(provider, system, user, schema, max_tokens)
+        except Exception as e:
+            fallback = chain[idx + 1] if idx + 1 < len(chain) else None
+            _warn_provider_failed(provider, e, fallback)
+            if fallback is None:
+                raise
+
+
+def _complete_with_provider(provider: str, system: str, user: str, max_tokens: int) -> str:
+    if provider == "openai":
         completion = _openai().chat.completions.create(
             model=config.OPENAI_MODEL,
             max_completion_tokens=max_tokens,
@@ -188,9 +311,11 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
             ],
         )
         return completion.choices[0].message.content or ""
-    if config.PROVIDER == "gemini":
+    if provider == "gemini":
         return _gemini_generate(system, user, max_tokens)
-    if config.PROVIDER == "anthropic":
+    if provider == "github_models":
+        return _github_models_generate(system, user, max_tokens)
+    if provider == "anthropic":
         msg = _anthropic().messages.create(
             model=config.MODEL,
             max_tokens=max_tokens,
@@ -200,7 +325,22 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
             messages=[{"role": "user", "content": user}],
         )
         return "".join(b.text for b in msg.content if b.type == "text")
-    raise ValueError(f"Unknown RADAR_PROVIDER: {config.PROVIDER!r}")
+    raise ValueError(f"Unknown RADAR_PROVIDER: {provider!r}")
+
+
+def _complete(system: str, user: str, max_tokens: int) -> str:
+    """Plain-text completion."""
+    chain = _ready_provider_chain()
+    if not chain:
+        raise RuntimeError("No configured LLM provider has credentials.")
+    for idx, provider in enumerate(chain):
+        try:
+            return _complete_with_provider(provider, system, user, max_tokens)
+        except Exception as e:
+            fallback = chain[idx + 1] if idx + 1 < len(chain) else None
+            _warn_provider_failed(provider, e, fallback)
+            if fallback is None:
+                raise
 
 
 def _render_items(items: list[SourceItem]) -> str:
