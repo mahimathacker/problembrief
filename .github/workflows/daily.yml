@@ -26,8 +26,8 @@ jobs:
       - name: Run Problembrief
         env:
           # Set these in Settings → Secrets and variables → Actions → Variables.
-          # Falls back to Anthropic if RADAR_PROVIDER is not configured.
-          RADAR_PROVIDER: ${{ vars.RADAR_PROVIDER || 'anthropic' }}
+          # Falls back to OpenAI if RADAR_PROVIDER is not configured.
+          RADAR_PROVIDER: ${{ vars.RADAR_PROVIDER || 'openai' }}
           RADAR_MODEL: ${{ vars.RADAR_MODEL || 'claude-opus-4-8' }}
           RADAR_OPENAI_MODEL: ${{ vars.RADAR_OPENAI_MODEL || 'gpt-4o' }}
           RADAR_GEMINI_MODEL: ${{ vars.RADAR_GEMINI_MODEL || 'gemini-2.5-flash' }}
