@@ -162,15 +162,17 @@ def _parse(system: str, user: str, schema, max_tokens: int):
         return completion.choices[0].message.parsed
     if config.PROVIDER == "gemini":
         return _parse_gemini(system, user, schema, max_tokens)
-    resp = _anthropic().messages.parse(
-        model=config.MODEL,
-        max_tokens=max_tokens,
-        temperature=0,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-        output_format=schema,
-    )
-    return resp.parsed_output
+    if config.PROVIDER == "anthropic":
+        resp = _anthropic().messages.parse(
+            model=config.MODEL,
+            max_tokens=max_tokens,
+            temperature=0,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+            output_format=schema,
+        )
+        return resp.parsed_output
+    raise ValueError(f"Unknown RADAR_PROVIDER: {config.PROVIDER!r}")
 
 
 def _complete(system: str, user: str, max_tokens: int) -> str:
@@ -188,15 +190,17 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
         return completion.choices[0].message.content or ""
     if config.PROVIDER == "gemini":
         return _gemini_generate(system, user, max_tokens)
-    msg = _anthropic().messages.create(
-        model=config.MODEL,
-        max_tokens=max_tokens,
-        temperature=0,
-        thinking={"type": "adaptive"},
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    return "".join(b.text for b in msg.content if b.type == "text")
+    if config.PROVIDER == "anthropic":
+        msg = _anthropic().messages.create(
+            model=config.MODEL,
+            max_tokens=max_tokens,
+            temperature=0,
+            thinking={"type": "adaptive"},
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        return "".join(b.text for b in msg.content if b.type == "text")
+    raise ValueError(f"Unknown RADAR_PROVIDER: {config.PROVIDER!r}")
 
 
 def _render_items(items: list[SourceItem]) -> str:

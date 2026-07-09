@@ -22,11 +22,17 @@ def main() -> int:
             print("ERROR: set GEMINI_API_KEY (or use RADAR_PROVIDER=anthropic/openai).")
             return 1
         active_model = config.GEMINI_MODEL
-    else:
+    elif config.PROVIDER == "anthropic":
         if not os.getenv("ANTHROPIC_API_KEY"):
             print("ERROR: set ANTHROPIC_API_KEY (copy .env.example to .env).")
             return 1
         active_model = config.MODEL
+    else:
+        print(
+            "ERROR: RADAR_PROVIDER must be one of: anthropic, openai, gemini. "
+            f"Got {config.PROVIDER!r}."
+        )
+        return 1
 
     print(f"Problembrief — provider={config.PROVIDER} model={active_model}\n")
     graph = build_graph()

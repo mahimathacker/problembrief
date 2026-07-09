@@ -11,20 +11,20 @@ load_dotenv()
 # --- Provider & model ----------------------------------------------------
 # Backend LLM: "anthropic" (default), "openai", or "gemini". Switch providers when
 # you're low on one provider's credits.
-PROVIDER = os.getenv("RADAR_PROVIDER", "anthropic").lower()
+PROVIDER = os.getenv("RADAR_PROVIDER", "anthropic").strip().lower()
 
 # Anthropic model (used when PROVIDER=anthropic). Quality is the whole point, so
 # default to the most capable Claude model.
-MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8")
+MODEL = os.getenv("RADAR_MODEL", "claude-opus-4-8").strip()
 
 # OpenAI model + key (used when RADAR_PROVIDER=openai).
-OPENAI_MODEL = os.getenv("RADAR_OPENAI_MODEL", "gpt-5.5")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("RADAR_OPENAI_MODEL", "gpt-5.5").strip()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 
 # Gemini model + key (used when RADAR_PROVIDER=gemini). Uses Google's REST API via
 # httpx, so no separate SDK is required.
-GEMINI_MODEL = os.getenv("RADAR_GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("RADAR_GEMINI_MODEL", "gemini-2.5-flash").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
 # --- Sources -------------------------------------------------------------
 # How many items to pull from each source (HN, Lobsters, Dev.to, GitHub).
