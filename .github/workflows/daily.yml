@@ -25,9 +25,12 @@ jobs:
 
       - name: Run Problembrief
         env:
-          # Switch providers here when quota runs out: anthropic, openai, or gemini.
-          RADAR_PROVIDER: gemini
-          RADAR_GEMINI_MODEL: gemini-2.5-flash
+          # Set these in Settings → Secrets and variables → Actions → Variables.
+          # Falls back to Anthropic if RADAR_PROVIDER is not configured.
+          RADAR_PROVIDER: ${{ vars.RADAR_PROVIDER || 'anthropic' }}
+          RADAR_MODEL: ${{ vars.RADAR_MODEL || 'claude-opus-4-8' }}
+          RADAR_OPENAI_MODEL: ${{ vars.RADAR_OPENAI_MODEL || 'gpt-4o' }}
+          RADAR_GEMINI_MODEL: ${{ vars.RADAR_GEMINI_MODEL || 'gemini-2.5-flash' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
