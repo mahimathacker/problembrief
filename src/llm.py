@@ -90,6 +90,14 @@ def _warn_provider_failed(provider: str, err: Exception, fallback: str | None) -
         print(f"  ! {label} failed and no fallback remains: {msg}")
 
 
+def _is_payload_too_large(err: Exception) -> bool:
+    response = getattr(err, "response", None)
+    if getattr(response, "status_code", None) == 413:
+        return True
+    msg = str(err).lower()
+    return "413" in msg and "payload too large" in msg
+
+
 def _github_models_generate(
     system: str,
     user: str,
@@ -443,18 +451,38 @@ workarounds, switching intent, compliance risk, or direct purchasing language.
 
 
 def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[PainPoint]:
+    def extract_batch(batch: list[SourceItem], label: str) -> list[PainPoint]:
+        try:
+            parsed = _parse(
+                _EXTRACT_SYS,
+                "Extract pain points from these posts:\n\n" + _render_items(batch),
+                Extraction,
+                8000,
+            )
+            return parsed.pain_points if parsed else []
+        except Exception as e:
+            if _is_payload_too_large(e):
+                if len(batch) > 1:
+                    mid = max(1, len(batch) // 2)
+                    print(
+                        f"  ! batch {label} too large for fallback model; "
+                        f"splitting {len(batch)} items into {mid}+{len(batch) - mid}"
+                    )
+                    return extract_batch(batch[:mid], f"{label}a") + extract_batch(
+                        batch[mid:], f"{label}b"
+                    )
+                print(
+                    f"  ! source item {batch[0].id} is too large for fallback model; skipping"
+                )
+                return []
+            raise
+
     out: list[PainPoint] = []
     for start in range(0, len(items), batch_size):
         batch = items[start : start + batch_size]
-        parsed = _parse(
-            _EXTRACT_SYS,
-            "Extract pain points from these posts:\n\n" + _render_items(batch),
-            Extraction,
-            8000,
-        )
-        if parsed:
-            out.extend(parsed.pain_points)
-        print(f"  - extracted from batch {start // batch_size + 1}: {len(out)} total")
+        batch_no = start // batch_size + 1
+        out.extend(extract_batch(batch, str(batch_no)))
+        print(f"  - extracted from batch {batch_no}: {len(out)} total")
 
     from collections import Counter
 
@@ -606,7 +634,13 @@ def dedupe(
     Market validation happens later, in the enrichment step — not here."""
     if not pain_points:
         return []
-    cap = config.GEMINI_MAX_PAIN_POINTS if config.PROVIDER == "gemini" else config.MAX_PAIN_POINTS
+    providers = _provider_chain()
+    if "github_models" in providers:
+        cap = min(config.MAX_PAIN_POINTS, config.GITHUB_MODELS_MAX_PAIN_POINTS)
+    elif "gemini" in providers:
+        cap = min(config.MAX_PAIN_POINTS, config.GEMINI_MAX_PAIN_POINTS)
+    else:
+        cap = config.MAX_PAIN_POINTS
     ranked = sorted(pain_points, key=_composite, reverse=True)[:cap]
     payload = json.dumps([p.model_dump() for p in ranked])
     parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 16000)

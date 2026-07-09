@@ -34,6 +34,7 @@ jobs:
           RADAR_OPENAI_MODEL: ${{ vars.RADAR_OPENAI_MODEL || 'gpt-4o' }}
           RADAR_GEMINI_MODEL: ${{ vars.RADAR_GEMINI_MODEL || 'gemini-2.5-flash' }}
           RADAR_GITHUB_MODEL: ${{ vars.RADAR_GITHUB_MODEL || 'openai/gpt-4o-mini' }}
+          RADAR_GITHUB_MAX_PAIN_POINTS: ${{ vars.RADAR_GITHUB_MAX_PAIN_POINTS || '24' }}
           RADAR_MODEL: ${{ vars.RADAR_MODEL || 'claude-opus-4-8' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
