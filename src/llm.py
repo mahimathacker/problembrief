@@ -251,6 +251,59 @@ def _json_from_text(text: str):
     return json.loads(text)
 
 
+_DEFAULT_PAIN_SCORES = {
+    "pain": 3,
+    "frequency": 2,
+    "buildability": 3,
+    "market_signal": 2,
+    "personal_interest": 3,
+}
+
+
+def _coerce_schema_payload(data, schema):
+    """Fill conservative defaults when weaker JSON-mode models omit score fields."""
+    if schema is Extraction:
+        items = data.get("pain_points", []) if isinstance(data, dict) else []
+        clean = []
+        for item in items:
+            if isinstance(item, dict):
+                if not item.get("summary"):
+                    continue
+                item.setdefault("category", config.CATEGORIES[0])
+                if item.get("category") not in config.CATEGORIES:
+                    item["category"] = config.CATEGORIES[0]
+                for key, value in _DEFAULT_PAIN_SCORES.items():
+                    item.setdefault(key, value)
+                item.setdefault("source_ids", [])
+                item.setdefault("evidence", "")
+                clean.append(item)
+        if isinstance(data, dict):
+            data["pain_points"] = clean
+        return data
+
+    if schema is Deduped:
+        items = data.get("opportunities", []) if isinstance(data, dict) else []
+        clean = []
+        for item in items:
+            if isinstance(item, dict):
+                if not item.get("summary"):
+                    continue
+                item.setdefault("category", config.CATEGORIES[0])
+                if item.get("category") not in config.CATEGORIES:
+                    item["category"] = config.CATEGORIES[0]
+                for key, value in _DEFAULT_PAIN_SCORES.items():
+                    item.setdefault(key, value)
+                item.setdefault("source_ids", [])
+                item.setdefault("evidence", "")
+                item.setdefault("composite", 0)
+                clean.append(item)
+        if isinstance(data, dict):
+            data["opportunities"] = clean
+        return data
+
+    return data
+
+
 def _parse_json_completion(
     provider: str,
     system: str,
@@ -274,7 +327,8 @@ def _parse_json_completion(
         else:
             raise ValueError(f"Provider does not use JSON completion parse: {provider!r}")
         try:
-            return schema.model_validate(_json_from_text(text))
+            data = _coerce_schema_payload(_json_from_text(text), schema)
+            return schema.model_validate(data)
         except Exception as e:
             last_error = e
             label = _PROVIDER_LABELS.get(provider, provider)
