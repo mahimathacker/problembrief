@@ -117,8 +117,7 @@ HN_RECENCY_DAYS = int(os.getenv("RADAR_HN_RECENCY_DAYS", "21"))
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "8"))
 
-# Beyond dev forums: discover real-world pain in OTHER categories (normal businesses,
-# non-AI tech) via rotating web searches, so the brief isn't all AI-infra. A rotating
+# Beyond dev forums: discover real-world pain in a small set of categories. A rotating
 # subset runs each day. Needs TAVILY_API_KEY; skipped without it.
 DISCOVERY_QUERIES = [
     q.strip()
@@ -127,36 +126,22 @@ DISCOVERY_QUERIES = [
         ";".join(
             [
                 "small business owners frustrated with their current software",
-                "tutors and coaching classes frustrated with admin software",
-                "private tutors struggling with scheduling payments and parent updates",
                 "small shop owners frustrated with inventory billing and WhatsApp orders",
-                "local travel agents frustrated with booking itinerary and payment workflows",
-                "creators frustrated with sponsorship invoicing content planning and analytics",
-                "students frustrated with study planning internships and college admin tools",
-                "freelancers frustrated with invoicing client follow-up and project handoff",
-                "women learning tech frustrated with mentorship job search and confidence support",
-                "small agencies frustrated with client approvals reporting and project management",
-                "local service providers frustrated with booking reminders payments and customer follow-up",
-                "early builders outside big cities frustrated with startup tools payments and distribution",
-                "what software do restaurant and cafe owners wish existed",
-                "manual time-wasting tasks at dental and medical clinics",
-                "tools real estate agents complain about",
-                "accountants and bookkeepers frustrated with their software",
-                "logistics and shipping teams software pain points",
-                "gym and salon owners frustrated with booking software",
-                "retail and ecommerce sellers frustrated with their tools",
-                "law firms frustrated with legal software",
-                "non-AI developer tools people are frustrated with",
-                "mobile app developers frustrated with their tooling",
-                "data engineers frustrated with their current tools",
-                "fintech and payments teams software pain points",
-                "marketing and sales teams frustrated with their software",
+                "real estate agents complain about CRM lead follow up listing software",
                 "property managers and landlords software frustrations",
-                "freelancers frustrated with invoicing and client management",
+                "gym owners frustrated with booking membership software",
+                "personal trainers frustrated with client tracking payments scheduling",
+                "patients frustrated with doctor visit preparation symptom tracking",
                 "women with PCOS PMOS frustrated with doctor appointments and symptom tracking",
-                "women with migraine endometriosis PCOS dismissed by doctors appointment prep",
-                "patients with chronic health conditions frustrated with doctor visit preparation",
-                "caregivers frustrated with medication tracking appointments and health records",
+                "salon owners frustrated with booking inventory client follow up software",
+                "beauty creators frustrated with brand deals invoicing content planning",
+                "fashion boutique owners frustrated with inventory orders returns software",
+                "accountants and bookkeepers frustrated with their software",
+                "CA firms frustrated with client document collection GST tax workflows",
+                "marketing agencies frustrated with client approvals reporting project management",
+                "creators frustrated with sponsorship invoicing content planning and analytics",
+                "non-AI developer tools people are frustrated with",
+                "AI agent builders frustrated with evals memory tool calling reliability",
             ]
         ),
     ).split(";")
@@ -176,15 +161,18 @@ REDDIT_WEB_QUERIES = [
                 'site:reddit.com/r/smallbusiness "does anyone know a tool"',
                 'site:reddit.com/r/smallbusiness "manual" "software"',
                 'site:reddit.com/r/smallbusiness "wish there was"',
+                'site:reddit.com/r/realtors "frustrated" "software"',
+                'site:reddit.com/r/realestate "property management software"',
+                'site:reddit.com/r/personaltraining "client" "software"',
+                'site:reddit.com/r/PCOS "doctor" "dismissed"',
+                'site:reddit.com/r/migraine "tracking" "doctor"',
+                'site:reddit.com/r/salons "booking software"',
+                'site:reddit.com/r/Bookkeeping "client documents"',
+                'site:reddit.com/r/marketing "client approval"',
                 'site:reddit.com/r/SaaS "is there a tool"',
-                'site:reddit.com/r/SaaS "manual process"',
-                'site:reddit.com/r/SaaS "frustrated with"',
-                'site:reddit.com/r/startups "what tool"',
                 'site:reddit.com/r/webdev "I hate"',
                 'site:reddit.com/r/webdev "is there a way to"',
-                'site:reddit.com/r/webdev "frustrated with"',
-                'site:reddit.com/r/devops "is there a tool"',
-                'site:reddit.com/r/freelance "client" "software"',
+                'site:reddit.com/r/LocalLLaMA "agent" "frustrated"',
             ]
         ),
     ).split(";")
@@ -206,32 +194,16 @@ INTERESTS = [
 ]
 
 CATEGORIES = [
-    # dev / AI
-    "ai_agents",
+    # focused v1 categories
     "devtools",
-    "dx",
-    "automation",
-    "apis_sdks",
-    "databases",
-    "web",
-    "mobile",
-    "data",
-    "security",
-    # business / vertical / everyday
-    "fintech",
-    "ecommerce",
-    "healthtech",
-    "womens_health",
-    "general_health",
-    "education",
-    "local_services",
-    "agencies",
-    "marketing",
-    "vertical_saas",
+    "ai_agents",
     "small_business",
-    "creator_tools",
-    "consumer",
-    "other",
+    "real_estate",
+    "fitness",
+    "health",
+    "fashion_beauty",
+    "accounting_ca",
+    "marketing_creator_agencies",
 ]
 
 # --- Scoring weights (composite = weighted sum of the 1-5 sub-scores) -----

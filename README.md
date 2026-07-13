@@ -81,9 +81,9 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
     gripes about *existing products*, not launch headlines.
   - **Lobsters** (`hottest.json`) and **Dev.to** (`/api/articles`).
   - **GitHub Issues** (Search API) — recent issues (last ~30 days) matching pain queries.
-  - **Web discovery** — optional search-backed discovery across small business,
-    vertical SaaS, ecommerce, education, local services, agencies, women’s health,
-    general health, security, AI, developer tools, and other categories.
+  - **Web discovery** — optional search-backed discovery across the focused v1
+    categories: DevTools, AI agents, small businesses, real estate, fitness, health,
+    fashion/beauty, accounting/CA, and marketing/creator/agencies.
   - **Reddit web discovery** — optional Tavily searches for narrow public Reddit pain
     signals, such as `site:reddit.com/r/smallbusiness frustrated software`,
     `site:reddit.com/r/SaaS "is there a tool"`, and
@@ -97,11 +97,11 @@ fetch_sources → extract_pain_points → dedupe_similar → generate_daily_brie
     with their **top comments**, where the real pain shows. A **cross-run dedup** then
     drops anything already surfaced within `RADAR_DEDUP_DAYS` (default 7). A free
     `GITHUB_TOKEN` just raises GitHub's rate limit; one failing source won't kill the run.
-- **extract_pain_points** — Claude reads each batch and pulls concrete, buildable
+- **extract_pain_points** — the configured LLM reads each batch and pulls concrete, buildable
   problems, each tagged with a category and 1–5 scores (pain, frequency,
   buildability, market signal, personal interest), citing its source posts.
-- **dedupe_similar** — Claude merges near-duplicates into single opportunities.
-- **generate_daily_brief** — a composite score is computed in code, and Claude writes
+- **dedupe_similar** — the configured LLM merges near-duplicates into single opportunities.
+- **generate_daily_brief** — a composite score is computed in code, and the configured LLM writes
   a skimmable Markdown brief from the top opportunities.
 - **save_results** — writes `briefs/YYYY-MM-DD.md` and records the surfaced
   opportunities' source URLs to `state/seen.json` (the dedup store). On the daily cron,
@@ -113,6 +113,8 @@ with structured outputs. The pipeline is provider-agnostic:
 - Anthropic: `RADAR_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, optional `RADAR_MODEL`
 - OpenAI: `RADAR_PROVIDER=openai`, `OPENAI_API_KEY`, optional `RADAR_OPENAI_MODEL`
 - Gemini: `RADAR_PROVIDER=gemini`, `GEMINI_API_KEY`, optional `RADAR_GEMINI_MODEL`
+- GitHub Models: `RADAR_PROVIDER=github_models`, `GITHUB_TOKEN` or
+  `GITHUB_MODELS_TOKEN`, optional `RADAR_GITHUB_MODEL`
 
 Gemini uses Google's REST API through `httpx`, so no extra SDK dependency is required.
 The default Gemini model is `gemini-2.5-flash` because scheduled runs make many LLM

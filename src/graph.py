@@ -31,32 +31,18 @@ def dedupe_similar(state: RadarState) -> RadarState:
 
 
 _BUILDER_CATEGORIES = {
-    "ai_agents",
     "devtools",
-    "dx",
-    "automation",
-    "apis_sdks",
-    "databases",
-    "web",
-    "mobile",
-    "data",
-    "security",
+    "ai_agents",
 }
 
 _BUSINESS_CATEGORIES = {
-    "fintech",
-    "ecommerce",
-    "healthtech",
-    "womens_health",
-    "general_health",
-    "education",
-    "local_services",
-    "agencies",
-    "marketing",
-    "vertical_saas",
     "small_business",
-    "creator_tools",
-    "consumer",
+    "real_estate",
+    "fitness",
+    "health",
+    "fashion_beauty",
+    "accounting_ca",
+    "marketing_creator_agencies",
 }
 
 

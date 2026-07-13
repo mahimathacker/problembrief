@@ -98,6 +98,14 @@ def _is_payload_too_large(err: Exception) -> bool:
     return "413" in msg and "payload too large" in msg
 
 
+def _is_rate_limited(err: Exception) -> bool:
+    response = getattr(err, "response", None)
+    if getattr(response, "status_code", None) == 429:
+        return True
+    msg = str(err).lower()
+    return "429" in msg or "too many requests" in msg or "rate limit" in msg
+
+
 def _github_models_generate(
     system: str,
     user: str,
@@ -131,20 +139,36 @@ def _github_models_generate(
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type": "application/json",
     }
-    r = httpx.post(
-        "https://models.github.ai/inference/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=120,
-    )
-    if json_mode and r.status_code == 400 and "response_format" in payload:
-        payload.pop("response_format", None)
+    last_response = None
+    for attempt in range(5):
         r = httpx.post(
             "https://models.github.ai/inference/chat/completions",
             headers=headers,
             json=payload,
             timeout=120,
         )
+        if json_mode and r.status_code == 400 and "response_format" in payload:
+            payload.pop("response_format", None)
+            r = httpx.post(
+                "https://models.github.ai/inference/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=120,
+            )
+        if r.status_code != 429:
+            break
+        last_response = r
+        retry_after = r.headers.get("retry-after")
+        delay = int(retry_after) if retry_after and retry_after.isdigit() else 12 * (attempt + 1)
+        print(
+            f"  ! GitHub Models rate limited; retrying in {delay}s "
+            f"(attempt {attempt + 1}/5)"
+        )
+        time.sleep(delay)
+    else:
+        assert last_response is not None
+        last_response.raise_for_status()
+
     r.raise_for_status()
     data = r.json()
     return data["choices"][0]["message"].get("content", "") or ""
@@ -353,11 +377,15 @@ def _complete(system: str, user: str, max_tokens: int) -> str:
 
 def _render_items(items: list[SourceItem]) -> str:
     lines = []
+    max_text_chars = 2600 if "github_models" in _provider_chain() else 5000
     for it in items:
+        text = it.text or "(link-only post)"
+        if len(text) > max_text_chars:
+            text = text[:max_text_chars].rsplit(" ", 1)[0] + "…"
         lines.append(
             f"[{it.id}] ({it.source}, {it.points} pts, {it.num_comments} comments)\n"
             f"  title: {it.title}\n"
-            f"  body: {it.text or '(link-only post)'}"
+            f"  body: {text}"
         )
     return "\n\n".join(lines)
 
@@ -370,16 +398,31 @@ def _source_from_id(source_id: str) -> str:
 
 # --- 1. extract ----------------------------------------------------------
 
-_EXTRACT_SYS = f"""You analyze posts, comment threads, AND web articles — from developer \
-communities and the wider web — and extract concrete, buildable PAIN POINTS: real \
-frustrations, repeated complaints, or unmet needs someone could turn into a product. \
-The pain can belong to DEVELOPERS, to NORMAL BUSINESSES (restaurants, clinics, shops, \
-agencies, real-estate, logistics, gyms, law firms…), or to EVERYDAY people — all are \
-welcome. Build for broad everyday users only through reachable starting groups: tutors, \
-coaching classes, small shop owners, local travel agents, creators, students, freelancers, \
-women learning tech, small agencies, local service providers, early builders outside big \
-cities, women managing health problems, and patients/caregivers handling everyday health \
-admin.
+_EXTRACT_SYS = f"""You analyze posts, comment threads, AND web articles and extract \
+concrete, buildable PAIN POINTS: real frustrations, repeated complaints, or unmet needs \
+someone could turn into a product.
+
+Only extract problems that fit one of these focused categories:
+- `devtools`: tools for developers, APIs, CI, testing, docs, SDKs, databases, web/mobile \
+engineering, DevOps, security, and developer workflow.
+- `ai_agents`: AI agents, coding agents, evals, memory, tool calling, agent reliability, \
+AI workflow automation, and AI app builders.
+- `small_business`: small shops, restaurants, local services, tutors/coaching classes, \
+travel agents, freelancers, and owner-operator admin workflows.
+- `real_estate`: realtors, brokers, property managers, landlords, rentals, listings, \
+lead follow-up, inspections, leases, and tenant workflows.
+- `fitness`: gyms, studios, personal trainers, coaches, memberships, bookings, client \
+plans, progress tracking, and payments.
+- `health`: patient/caregiver health admin, women's health, PCOS/PMOS, migraine, doctor \
+visit prep, symptoms, meds, records, and clinic-facing workflows.
+- `fashion_beauty`: fashion boutiques, salons, beauty services, cosmetics, inventory, \
+appointments, clients, returns, and creator commerce in fashion/beauty.
+- `accounting_ca`: accountants, bookkeepers, CA firms, tax/GST, client document \
+collection, month-end close, invoices, reconciliation, and finance ops for firms.
+- `marketing_creator_agencies`: creators, marketers, small agencies, sponsorships, \
+content planning, client approvals, reporting, analytics, and campaign operations.
+
+If a post does not fit these categories, skip it. Do not create an `other` category.
 
 Reading the input:
 - A post may include a "Top comments:" section. Treat comments as the strongest \
@@ -392,25 +435,12 @@ as noisy but valuable complaint signals. Be strict: extract them only when the p
 shows a specific user, a real job-to-be-done, a repeated/manual workaround, money/time \
 lost, switching intent, or a clear "is there a tool for X" need. Do NOT turn one vague \
 rant, meme, preference, or generic "I hate X" into an opportunity.
-- IMPORTANT: do NOT let AI/infra/dev-tooling topics crowd out everything else. Actively \
-pull problems from OTHER categories too — normal businesses, reachable everyday groups, \
-and other tech areas (web, mobile, data, fintech, e-commerce, healthcare, marketing). \
-Variety across categories is a goal.
-
-Category guidance:
-- Use `womens_health` for patient-facing women-specific health workflows: PCOS/PMOS, \
-endometriosis, periods, fertility, menopause, migraine around hormones, appointment prep, \
-symptom/lab summaries, and being dismissed in care.
-- Use `general_health` for patient/caregiver health admin not specific to women: chronic \
-condition tracking, medication routines, appointment prep, records, caregiver coordination.
-- Use `healthtech` for provider/clinic/admin software, not consumer health.
-- Use `education` for tutors, coaching classes, students, test prep, learning workflows.
-- Use `local_services` for salons, repair shops, home services, local travel agents, gyms, \
-and other local operators.
-- Use `agencies` for small creative/marketing/dev agencies and client-service workflows.
+- IMPORTANT: do NOT let AI/dev-tooling topics crowd out everything else. If a batch has \
+real small business, real estate, fitness, health, fashion/beauty, accounting/CA, or \
+marketing/creator/agency pain, extract it too.
 
 What to extract:
-- Be strict but keep category coverage: return the strongest 2-6 pain points per batch \
+- Be strict but keep category coverage: return the strongest 1-4 pain points per batch \
 (or zero if the batch has no real signal). When a batch contains both builder/dev/AI \
 pain and small-business/vertical pain, keep at least one of each if both are concrete.
 - Favor REAL, GENUINE problems whose solution would meaningfully help people — \
@@ -439,7 +469,7 @@ to-do / blogging app, personal-productivity fluff) unless the discussion shows p
 actually paying or switching.
 - `evidence` must be a real quote or close paraphrase from the post/comments.
 - Each pain point must cite the source id(s) it came from.
-- category must be exactly one of: {_CATS}.
+- category must be exactly one of: {_CATS}. Never return any other category name.
 
 Scoring (1-5 — calibrate honestly; most things are 2-3, reserve 5):
 - pain: 1 = mild annoyance, 5 = blocks real work / felt daily.
@@ -475,7 +505,13 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
                     f"  ! source item {batch[0].id} is too large for fallback model; skipping"
                 )
                 return []
+            if _is_rate_limited(e):
+                print(f"  ! batch {label} skipped after provider rate limits")
+                return []
             raise
+
+    if "github_models" in _provider_chain():
+        batch_size = min(batch_size, 8)
 
     out: list[PainPoint] = []
     for start in range(0, len(items), batch_size):
@@ -643,7 +679,21 @@ def dedupe(
         cap = config.MAX_PAIN_POINTS
     ranked = sorted(pain_points, key=_composite, reverse=True)[:cap]
     payload = json.dumps([p.model_dump() for p in ranked])
-    parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 16000)
+    try:
+        parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 16000)
+    except Exception as e:
+        if _is_payload_too_large(e) and len(ranked) > 10:
+            print("  ! dedupe payload too large; retrying with top 10 pain points")
+            ranked = ranked[:10]
+            payload = json.dumps([p.model_dump() for p in ranked])
+            parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 12000)
+        elif _is_rate_limited(e):
+            print("  ! dedupe skipped after provider rate limits; using top extracted pains")
+            direct = [Opportunity(**p.model_dump(), composite=_composite(p)) for p in ranked[:10]]
+            direct.sort(key=lambda o: o.composite, reverse=True)
+            return direct
+        else:
+            raise
     opps = parsed.opportunities if parsed else []
     for o in opps:
         o.composite = _composite(o)
@@ -672,7 +722,13 @@ Live web research context (existing tools, pricing, demand — may be empty):
 {context or '(no web research available — judge cautiously and lower conviction)'}
 
 Write the buildability thesis."""
-    thesis = _parse(_THESIS_SYS, user, MarketThesis, 4000)
+    try:
+        thesis = _parse(_THESIS_SYS, user, MarketThesis, 4000)
+    except Exception as e:
+        if _is_rate_limited(e) or _is_payload_too_large(e):
+            print(f"  ! thesis skipped for rate/payload limits: {lead.summary}")
+            return None
+        raise
     if thesis:
         thesis.source_ids = lead.source_ids
         thesis.category = lead.category
@@ -764,4 +820,37 @@ line on the biggest reason it could fail.
 the link text and its `url` as the target, copied verbatim. Omit if `sources` is empty.
 If there are zero theses, write only TL;DR and say the day was thin.
 Keep it short and easy to read. Most confident ideas first. Never invent a URL."""
-    return _complete(_BRIEF_SYS, user, 8000)
+    try:
+        return _complete(_BRIEF_SYS, user, 8000)
+    except Exception as e:
+        if _is_rate_limited(e) or _is_payload_too_large(e):
+            print("  ! final brief writer hit provider limits; writing fallback brief")
+            if not theses:
+                return (
+                    "## TL;DR\n"
+                    "Problembrief found no completed theses today because the LLM provider "
+                    "hit quota or rate limits during the run.\n\n"
+                    "## Buildable Ideas\n"
+                    "None.\n"
+                )
+            lines = [
+                "## TL;DR",
+                "Problembrief found research leads today, but the final writer hit provider "
+                "quota or rate limits. Review these partial leads manually.",
+                "",
+                "## Research Leads",
+            ]
+            for t in theses:
+                lines.extend(
+                    [
+                        f"### {t.title}",
+                        f"**Category:** {(t.category or '').replace('_', ' ').title()}",
+                        f"**Problem:** {t.problem}",
+                        f"**Who'd pay:** {t.buyer}",
+                        f"**First build:** {t.mvp}",
+                        f"**Confidence:** {t.conviction}. {t.biggest_risk}",
+                        "",
+                    ]
+                )
+            return "\n".join(lines).strip() + "\n"
+        raise
