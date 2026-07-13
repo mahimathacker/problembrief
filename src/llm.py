@@ -813,6 +813,43 @@ _SITE = {
 }
 
 
+def _source_markdown(sources: list[dict[str, str]]) -> str:
+    links = []
+    for src in sources:
+        site = src.get("site") or "Source"
+        url = src.get("url") or ""
+        if url:
+            links.append(f"[{site}]({url})")
+    return ", ".join(links)
+
+
+def _ensure_source_lines(markdown: str, payload_objs: list[dict]) -> str:
+    """Make source links deterministic; models sometimes omit them on research leads."""
+    for obj in payload_objs:
+        title = obj.get("title")
+        sources_md = _source_markdown(obj.get("sources", []))
+        if not title or not sources_md:
+            continue
+
+        heading = f"### {title}"
+        start = markdown.find(heading)
+        if start < 0:
+            continue
+        next_start = markdown.find("\n### ", start + len(heading))
+        end = next_start if next_start >= 0 else len(markdown)
+        block = markdown[start:end]
+        if "**Sources:**" in block:
+            continue
+
+        insert = f"\n**Sources:** {sources_md}\n"
+        if block.endswith("\n\n"):
+            replacement = block.rstrip() + insert + "\n\n"
+        else:
+            replacement = block.rstrip() + insert + "\n"
+        markdown = markdown[:start] + replacement + markdown[end:]
+    return markdown
+
+
 def write_brief(
     theses: list[MarketThesis],
     date_str: str,
@@ -875,7 +912,8 @@ the link text and its `url` as the target, copied verbatim. Omit if `sources` is
 If there are zero theses, write only TL;DR and say the day was thin.
 Keep it short and easy to read. Most confident ideas first. Never invent a URL."""
     try:
-        return _complete(_BRIEF_SYS, user, 8000)
+        brief = _complete(_BRIEF_SYS, user, 8000)
+        return _ensure_source_lines(brief, payload_objs)
     except Exception as e:
         if _is_rate_limited(e) or _is_payload_too_large(e):
             print("  ! final brief writer hit provider limits; writing fallback brief")
@@ -895,6 +933,13 @@ Keep it short and easy to read. Most confident ideas first. Never invent a URL."
                 "## Research Leads",
             ]
             for t in theses:
+                srcs, seen = [], set()
+                for sid in t.source_ids:
+                    u = id_to_url.get(sid)
+                    if u and u not in seen:
+                        seen.add(u)
+                        srcs.append({"site": _SITE.get(id_to_source.get(sid, ""), "source"), "url": u})
+                sources_md = _source_markdown(srcs[:5])
                 lines.extend(
                     [
                         f"### {t.title}",
@@ -903,6 +948,7 @@ Keep it short and easy to read. Most confident ideas first. Never invent a URL."
                         f"**Who'd pay:** {t.buyer}",
                         f"**First build:** {t.mvp}",
                         f"**Confidence:** {t.conviction}. {t.biggest_risk}",
+                        f"**Sources:** {sources_md}" if sources_md else "",
                         "",
                     ]
                 )
