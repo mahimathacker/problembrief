@@ -116,6 +116,9 @@ HN_RECENCY_DAYS = int(os.getenv("RADAR_HN_RECENCY_DAYS", "21"))
 # (lower conviction). Free key: https://tavily.com
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "8"))
+# Extra pricing searches per enriched lead. Higher means better pricing coverage but
+# more Tavily usage.
+PRICING_LOOKUPS_PER_LEAD = int(os.getenv("RADAR_PRICING_LOOKUPS_PER_LEAD", "4"))
 
 # Beyond dev forums: discover real-world pain in a small set of categories. A rotating
 # subset runs each day. Needs TAVILY_API_KEY; skipped without it.

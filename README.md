@@ -148,6 +148,8 @@ Everything tunable lives in `config.py` (override via `.env`):
 - `RADAR_GITHUB_RECENCY_DAYS` — only pull GitHub issues created in the last N days (default 30)
 - `RADAR_DEDUP_DAYS` — don't resurface a problem within N days (default 7)
 - `RADAR_ENRICH_TOP_N` — max leads to research and include (default 8; fewer when the day is thin)
+- `RADAR_PRICING_LOOKUPS_PER_LEAD` — targeted competitor pricing searches per enriched lead
+  (default 4)
 - `RADAR_REDDIT_WEB_QUERIES` — semicolon-separated public Reddit web-search queries
 - `RADAR_REDDIT_WEB_PER_DAY` — how many Reddit web queries to run daily
 - `RADAR_REDDIT_WEB_RESULTS_PER_QUERY` — max Tavily results per Reddit web query
