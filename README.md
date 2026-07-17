@@ -10,10 +10,9 @@ The goal is simple: help a builder find real problems from public signals instea
 starting from random ideas.
 
 Problembrief can scan developer pain, but it is not only a developer-tool radar. It also
-looks for everyday-user problems in reachable groups: tutors and coaching classes, small
-shop owners, local travel agents, creators, students, freelancers, women learning tech,
-small agencies, local service providers, early builders outside big cities, women’s
-health, and general patient/caregiver health workflows.
+looks for everyday-user problems in focused reachable categories: small businesses,
+real estate, fitness, general health, fashion/beauty, accounting/CA, and
+marketing/creator/agencies.
 
 This is **V1 — the thinnest useful slice**: fetch → extract → dedupe → score → brief
 to a file. No database, no dashboard yet. Get a brief you'd actually read first; widen

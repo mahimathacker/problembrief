@@ -467,8 +467,10 @@ travel agents, freelancers, and owner-operator admin workflows.
 lead follow-up, inspections, leases, and tenant workflows.
 - `fitness`: gyms, studios, personal trainers, coaches, memberships, bookings, client \
 plans, progress tracking, and payments.
-- `health`: patient/caregiver health admin, women's health, PCOS/PMOS, migraine, doctor \
-visit prep, symptoms, meds, records, and clinic-facing workflows.
+- `health`: general patient/caregiver health admin, doctor visit prep, symptoms, meds, \
+records, follow-up, chronic-care coordination, and clinic-facing workflows. Do NOT \
+extract disease-specific support/community ideas such as PCOS/PMOS/PCOD support \
+platforms unless the same pain clearly generalizes to broader health admin workflows.
 - `fashion_beauty`: fashion boutiques, salons, beauty services, cosmetics, inventory, \
 appointments, clients, returns, and creator commerce in fashion/beauty.
 - `accounting_ca`: accountants, bookkeepers, CA firms, tax/GST, client document \
@@ -702,6 +704,11 @@ _WEAK_OPPORTUNITY_TERMS = (
     "rate limits",
     "monitoring tool",
     "usage analytics",
+    "pcos",
+    "pmos",
+    "pcod",
+    "pcos patients",
+    "pcos support",
 )
 
 
