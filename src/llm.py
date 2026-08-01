@@ -136,7 +136,7 @@ def _github_models_generate(
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {config.GITHUB_MODELS_TOKEN}",
-        "X-GitHub-Api-Version": "2022-11-28",
+        "X-GitHub-Api-Version": config.GITHUB_MODELS_API_VERSION,
         "Content-Type": "application/json",
     }
     last_response = None
@@ -154,6 +154,11 @@ def _github_models_generate(
                 headers=headers,
                 json=payload,
                 timeout=120,
+            )
+        if r.status_code == 410:
+            print(
+                "  ! GitHub Models endpoint/API version returned 410 Gone; "
+                f"using api version {config.GITHUB_MODELS_API_VERSION}"
             )
         if r.status_code != 429:
             break

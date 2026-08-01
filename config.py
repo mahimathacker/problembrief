@@ -35,6 +35,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 # In GitHub Actions this can use the built-in GITHUB_TOKEN if the workflow grants
 # `models: read`.
 GITHUB_MODELS_MODEL = os.getenv("RADAR_GITHUB_MODEL", "openai/gpt-4o-mini").strip()
+GITHUB_MODELS_API_VERSION = os.getenv("RADAR_GITHUB_API_VERSION", "2026-03-10").strip()
 GITHUB_MODELS_TOKEN = (
     os.getenv("GITHUB_MODELS_TOKEN", "").strip()
     or os.getenv("GITHUB_TOKEN", "").strip()
