@@ -27,14 +27,16 @@ jobs:
       - name: Run Problembrief
         env:
           # Set these in Settings → Secrets and variables → Actions → Variables.
-          # OpenAI is the default quality path. GitHub Models is the default fallback
-          # so one provider quota issue does not kill the whole daily brief.
+          # OpenAI is the default quality path. Gemini is the first fallback, and
+          # GitHub Models is last because it can have brownouts.
           RADAR_PROVIDER: ${{ vars.RADAR_PROVIDER || 'openai' }}
-          RADAR_FALLBACK_PROVIDERS: ${{ vars.RADAR_FALLBACK_PROVIDERS || 'github_models' }}
+          RADAR_FALLBACK_PROVIDERS: ${{ vars.RADAR_FALLBACK_PROVIDERS || 'gemini,github_models' }}
           RADAR_OPENAI_MODEL: ${{ vars.RADAR_OPENAI_MODEL || 'gpt-4o' }}
           RADAR_GEMINI_MODEL: ${{ vars.RADAR_GEMINI_MODEL || 'gemini-2.5-flash' }}
           RADAR_GITHUB_MODEL: ${{ vars.RADAR_GITHUB_MODEL || 'openai/gpt-4o-mini' }}
           RADAR_GITHUB_API_VERSION: ${{ vars.RADAR_GITHUB_API_VERSION || '2026-03-10' }}
+          RADAR_GITHUB_OWNER: ${{ vars.RADAR_GITHUB_OWNER || github.repository_owner }}
+          RADAR_GITHUB_ENDPOINT: ${{ vars.RADAR_GITHUB_ENDPOINT }}
           RADAR_GITHUB_MAX_PAIN_POINTS: ${{ vars.RADAR_GITHUB_MAX_PAIN_POINTS || '24' }}
           RADAR_MODEL: ${{ vars.RADAR_MODEL || 'claude-opus-4-8' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

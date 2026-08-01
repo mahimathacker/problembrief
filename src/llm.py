@@ -106,6 +106,32 @@ def _is_rate_limited(err: Exception) -> bool:
     return "429" in msg or "too many requests" in msg or "rate limit" in msg
 
 
+def _is_provider_unavailable(err: Exception) -> bool:
+    response = getattr(err, "response", None)
+    status = getattr(response, "status_code", None)
+    if status in (410, 503):
+        return True
+    msg = str(err).lower()
+    return (
+        "github_models_retirement_brownout" in msg
+        or "temporarily unavailable" in msg
+        or "410 gone" in msg
+        or "503 service unavailable" in msg
+    )
+
+
+def _github_models_endpoints() -> list[str]:
+    if config.GITHUB_MODELS_ENDPOINT:
+        return [config.GITHUB_MODELS_ENDPOINT.rstrip("/")]
+    endpoints = []
+    if config.GITHUB_MODELS_OWNER:
+        endpoints.append(
+            f"https://models.github.ai/orgs/{config.GITHUB_MODELS_OWNER}/inference/chat/completions"
+        )
+    endpoints.append("https://models.github.ai/inference/chat/completions")
+    return endpoints
+
+
 def _github_models_generate(
     system: str,
     user: str,
@@ -140,43 +166,44 @@ def _github_models_generate(
         "Content-Type": "application/json",
     }
     last_response = None
-    for attempt in range(5):
-        r = httpx.post(
-            "https://models.github.ai/inference/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=120,
-        )
-        if json_mode and r.status_code == 400 and "response_format" in payload:
-            payload.pop("response_format", None)
+    for endpoint in _github_models_endpoints():
+        for attempt in range(5):
             r = httpx.post(
-                "https://models.github.ai/inference/chat/completions",
+                endpoint,
                 headers=headers,
                 json=payload,
+                params={"api-version": config.GITHUB_MODELS_API_VERSION},
                 timeout=120,
             )
-        if r.status_code == 410:
+            if json_mode and r.status_code == 400 and "response_format" in payload:
+                payload.pop("response_format", None)
+                r = httpx.post(
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    params={"api-version": config.GITHUB_MODELS_API_VERSION},
+                    timeout=120,
+                )
+            if r.status_code == 410:
+                body = r.text[:200].replace("\n", " ")
+                print(f"  ! GitHub Models returned 410 from {endpoint}: {body}")
+                last_response = r
+                break
+            if r.status_code != 429:
+                r.raise_for_status()
+                data = r.json()
+                return data["choices"][0]["message"].get("content", "") or ""
+            last_response = r
+            retry_after = r.headers.get("retry-after")
+            delay = int(retry_after) if retry_after and retry_after.isdigit() else 12 * (attempt + 1)
             print(
-                "  ! GitHub Models endpoint/API version returned 410 Gone; "
-                f"using api version {config.GITHUB_MODELS_API_VERSION}"
+                f"  ! GitHub Models rate limited; retrying in {delay}s "
+                f"(attempt {attempt + 1}/5)"
             )
-        if r.status_code != 429:
-            break
-        last_response = r
-        retry_after = r.headers.get("retry-after")
-        delay = int(retry_after) if retry_after and retry_after.isdigit() else 12 * (attempt + 1)
-        print(
-            f"  ! GitHub Models rate limited; retrying in {delay}s "
-            f"(attempt {attempt + 1}/5)"
-        )
-        time.sleep(delay)
-    else:
-        assert last_response is not None
-        last_response.raise_for_status()
+            time.sleep(delay)
 
-    r.raise_for_status()
-    data = r.json()
-    return data["choices"][0]["message"].get("content", "") or ""
+    assert last_response is not None
+    last_response.raise_for_status()
 
 
 def _gemini_generate(system: str, user: str, max_tokens: int, *, json_mode: bool = False) -> str:
@@ -566,8 +593,8 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
                     f"  ! source item {batch[0].id} is too large for fallback model; skipping"
                 )
                 return []
-            if _is_rate_limited(e):
-                print(f"  ! batch {label} skipped after provider rate limits")
+            if _is_rate_limited(e) or _is_provider_unavailable(e):
+                print(f"  ! batch {label} skipped after provider limits/unavailability")
                 return []
             raise
 
@@ -753,8 +780,8 @@ def dedupe(
             ranked = ranked[:10]
             payload = json.dumps([p.model_dump() for p in ranked])
             parsed = _parse(_DEDUPE_SYS, f"Pain points:\n{payload}", Deduped, 12000)
-        elif _is_rate_limited(e):
-            print("  ! dedupe skipped after provider rate limits; using top extracted pains")
+        elif _is_rate_limited(e) or _is_provider_unavailable(e):
+            print("  ! dedupe skipped after provider limits/unavailability; using top extracted pains")
             direct = [Opportunity(**p.model_dump(), composite=_composite(p)) for p in ranked[:10]]
             direct.sort(key=lambda o: o.composite, reverse=True)
             return direct
@@ -791,8 +818,8 @@ Write the buildability thesis."""
     try:
         thesis = _parse(_THESIS_SYS, user, MarketThesis, 4000)
     except Exception as e:
-        if _is_rate_limited(e) or _is_payload_too_large(e):
-            print(f"  ! thesis skipped for rate/payload limits: {lead.summary}")
+        if _is_rate_limited(e) or _is_payload_too_large(e) or _is_provider_unavailable(e):
+            print(f"  ! thesis skipped for provider limits/unavailability: {lead.summary}")
             return None
         raise
     if thesis:
@@ -927,8 +954,8 @@ Keep it short and easy to read. Most confident ideas first. Never invent a URL."
         brief = _complete(_BRIEF_SYS, user, 8000)
         return _ensure_source_lines(brief, payload_objs)
     except Exception as e:
-        if _is_rate_limited(e) or _is_payload_too_large(e):
-            print("  ! final brief writer hit provider limits; writing fallback brief")
+        if _is_rate_limited(e) or _is_payload_too_large(e) or _is_provider_unavailable(e):
+            print("  ! final brief writer hit provider limits/unavailability; writing fallback brief")
             if not theses:
                 return (
                     "## TL;DR\n"
