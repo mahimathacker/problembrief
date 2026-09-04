@@ -489,26 +489,15 @@ concrete, buildable PAIN POINTS: real frustrations, repeated complaints, or unme
 someone could turn into a product.
 
 Only extract problems that fit one of these focused categories:
-- `devtools`: tools for developers, APIs, CI, testing, docs, SDKs, databases, web/mobile \
-engineering, DevOps, security, and developer workflow.
-- `ai_agents`: AI agents, coding agents, evals, memory, tool calling, agent reliability, \
-AI workflow automation, and AI app builders.
-- `small_business`: small shops, restaurants, local services, tutors/coaching classes, \
-travel agents, freelancers, and owner-operator admin workflows.
-- `real_estate`: realtors, brokers, property managers, landlords, rentals, listings, \
-lead follow-up, inspections, leases, and tenant workflows.
-- `fitness`: gyms, studios, personal trainers, coaches, memberships, bookings, client \
-plans, progress tracking, and payments.
-- `health`: general patient/caregiver health admin, doctor visit prep, symptoms, meds, \
-records, follow-up, chronic-care coordination, and clinic-facing workflows. Do NOT \
-extract disease-specific support/community ideas such as PCOS/PMOS/PCOD support \
-platforms unless the same pain clearly generalizes to broader health admin workflows.
-- `fashion_beauty`: fashion boutiques, salons, beauty services, cosmetics, inventory, \
-appointments, clients, returns, and creator commerce in fashion/beauty.
-- `accounting_ca`: accountants, bookkeepers, CA firms, tax/GST, client document \
-collection, month-end close, invoices, reconciliation, and finance ops for firms.
-- `marketing_creator_agencies`: creators, marketers, small agencies, sponsorships, \
-content planning, client approvals, reporting, analytics, and campaign operations.
+- `devtools`: software teams and developer-facing products.
+- `ai_agents`: teams building, testing, or operating AI-agent products.
+- `small_business`: owner-led businesses and local operators.
+- `real_estate`: property, rental, brokerage, and real-estate operations.
+- `fitness`: gyms, studios, trainers, coaches, and wellness operators.
+- `health`: patient, caregiver, clinic, and health-operations problems.
+- `fashion_beauty`: fashion, beauty, salons, retail, services, and commerce.
+- `accounting_ca`: accountants, bookkeepers, auditors, CA firms, tax, and finance ops.
+- `marketing_creator_agencies`: marketers, creators, agencies, and client-service teams.
 
 If a post does not fit these categories, skip it. Do not create an `other` category.
 
@@ -526,6 +515,10 @@ rant, meme, preference, or generic "I hate X" into an opportunity.
 - IMPORTANT: do NOT let AI/dev-tooling topics crowd out everything else. If a batch has \
 real small business, real estate, fitness, health, fashion/beauty, accounting/CA, or \
 marketing/creator/agency pain, extract it too.
+- Avoid repeating the same obvious workflow every day. Look for the broader operating \
+problem underneath the post: where time, money, trust, compliance, handoffs, decisions, \
+visibility, or accountability break down. Do not default to the first common app idea \
+for that category.
 
 What to extract:
 - Be strict but keep category coverage: return the strongest 1-4 pain points per batch \
@@ -535,6 +528,9 @@ pain and small-business/vertical pain, keep at least one of each if both are con
 developers OR everyday/non-technical users. Real impact on real people matters more \
 than novelty or cleverness.
 - Prefer specific problems ("X has no good way to do Y") over broad topics ("AI is hard").
+- State the high-level pain first, then the specific evidence. Example style: \
+"Small firms lose control of deadline-sensitive client work across email, files, and \
+approvals" rather than "build a client document portal."
 - The goal is a HIGH-QUALITY PRODUCT OPPORTUNITY — a real problem with a clear user, \
 a believable buyer/adopter, repeated or intense pain, and a plausible wedge a small \
 team could ship. Useful tools are welcome, but only if they could become a durable \
@@ -631,6 +627,10 @@ feature-shaped or vendor-adjacent ideas.
 Rules:
 - Merge only real duplicates / near-duplicates (the same core problem); combine their \
 source_ids. Do NOT merge clearly different problems together.
+- Preserve distinct workflow breakdowns inside the same category. For example, in \
+accounting/CA do not merge audit evidence, tax deadline tracking, reconciliation \
+exceptions, review approvals, client communication, and billing leakage into one \
+"document collection" or "practice management" idea.
 - Keep EVERY distinct pain, across ALL categories. Do not collapse to a few themes and \
 do not let one category (like AI) crowd out the rest. Return the full distinct set — \
 typically most of the input.
@@ -743,6 +743,18 @@ _WEAK_OPPORTUNITY_TERMS = (
     "pcos support",
 )
 
+_STALE_LEAD_PATTERNS = (
+    ("amd", "intel", "gpu"),
+    ("non-nvidia", "gpu"),
+    ("client document collection", "accounting"),
+    ("client document collection", "ca firm"),
+    ("document portal", "accounting"),
+    ("document portal", "ca firm"),
+    ("caregiver", "medication tracker"),
+    ("caregiver", "medication app"),
+    ("chronic illness tracker", "symptom"),
+)
+
 
 def _passes_lead_bar(o: Opportunity) -> bool:
     """A real, concrete, buildable pain that isn't junk. Whether the MARKET is real is
@@ -752,6 +764,8 @@ def _passes_lead_bar(o: Opportunity) -> bool:
         return False
     text = " ".join((o.summary, o.evidence, o.category)).lower()
     if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
+        return False
+    if any(all(term in text for term in terms) for terms in _STALE_LEAD_PATTERNS):
         return False
     return True
 
