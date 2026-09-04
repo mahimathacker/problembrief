@@ -308,6 +308,10 @@ def _coerce_schema_payload(data, schema):
                     item.setdefault(key, value)
                 item.setdefault("source_ids", [])
                 item.setdefault("evidence", "")
+                item.setdefault("current_workaround", "")
+                item.setdefault("manual_steps", [])
+                item.setdefault("user_role", "")
+                item.setdefault("buyer_role", "")
                 clean.append(item)
         if isinstance(data, dict):
             data["pain_points"] = clean
@@ -327,6 +331,10 @@ def _coerce_schema_payload(data, schema):
                     item.setdefault(key, value)
                 item.setdefault("source_ids", [])
                 item.setdefault("evidence", "")
+                item.setdefault("current_workaround", "")
+                item.setdefault("manual_steps", [])
+                item.setdefault("user_role", "")
+                item.setdefault("buyer_role", "")
                 item.setdefault("composite", 0)
                 clean.append(item)
         if isinstance(data, dict):
@@ -519,6 +527,17 @@ marketing/creator/agency pain, extract it too.
 problem underneath the post: where time, money, trust, compliance, handoffs, decisions, \
 visibility, or accountability break down. Do not default to the first common app idea \
 for that category.
+- Look for MANUAL JOBS, not only complaints. Ask: what repeated sequence of work is a \
+person doing today? Examples: collecting inputs, checking them, moving data between \
+systems, following up, reconciling, reviewing exceptions, creating reports, updating \
+status, or coordinating people.
+- A strong opportunity may be hidden inside a workflow that users already consider \
+"normal." Do not require the source to explicitly ask for software.
+- Prefer problems where software could own most of an operational job end-to-end, while \
+humans handle exceptions or judgment.
+- Distinguish feature vs copilot vs operator. A feature helps one small step. A copilot \
+assists a human doing the job. An operator performs most of the workflow and brings \
+humans only exceptions. Prefer operator-level problems when the evidence supports them.
 
 What to extract:
 - Be strict but keep category coverage: return the strongest 1-4 pain points per batch \
@@ -552,12 +571,21 @@ switching, compliance pressure, revenue loss, or repeated workaround pain, do no
 to-do / blogging app, personal-productivity fluff) unless the discussion shows people \
 actually paying or switching.
 - `evidence` must be a real quote or close paraphrase from the post/comments.
+- In `current_workaround`, describe what users do today instead. If unknown, use "".
+- In `manual_steps`, list the repeated manual steps visible in the source. If unknown, \
+use [].
+- In `user_role`, name who does or feels the work. In `buyer_role`, name who would pay \
+or approve when visible. Use "" if unknown.
+- In `evidence`, include the current workaround when the source provides one. Prefer \
+evidence like "we export to Excel and reconcile every Friday" over a generic complaint.
 - Each pain point must cite the source id(s) it came from.
 - category must be exactly one of: {_CATS}. Never return any other category name.
 
 Scoring (1-5 — calibrate honestly; most things are 2-3, reserve 5):
 - pain: 1 = mild annoyance, 5 = blocks real work / felt daily.
-- frequency: 1 = one mention, 5 = echoed across many posts/comments.
+- frequency: 1 = appears once with no supporting discussion; 3 = repeated within one \
+thread or appears in 2 items in this batch; 5 = appears independently across several \
+distinct source items in this batch.
 - buildability: 1 = needs a huge moat or scale, 5 = a small team could ship a wedge in weeks.
 - market_signal: 1 = no sign anyone'd pay/adopt, 5 = budget/adoption pressure, paid \
 workarounds, switching intent, compliance risk, or direct purchasing language.
@@ -648,22 +676,29 @@ ONE problem, using live web-research context.
 
 Core judgment — WHO is the competition? A market crowded with small, focused startups \
 that charge money is a GREEN FLAG: demand is validated and you can win with a sharp \
-angle (like Tavily/Exa in search APIs). But if a BIG company — OpenAI, Anthropic, \
-Google, Microsoft, GitHub, AWS, Notion, and the like — or the dominant existing tool \
-already solves the SAME workflow for the SAME buyer, or can add the exact missing piece \
-as a normal next feature, that is a RED FLAG.
+angle. But if a large platform, or the vertical tool already used by this buyer, already \
+solves the SAME workflow for the SAME buyer, or can add the exact missing piece as a \
+normal next feature, that is a RED FLAG.
 
-Three tests that DECIDE conviction:
-1. Big-company test: could a big platform or the leading existing tool add the EXACT \
-workflow for the SAME narrow buyer as a simple feature? If yes → conviction LOW. But \
-do NOT mark risk high just because big companies exist nearby. If the idea needs niche \
-workflow knowledge, messy integrations, setup, compliance, service work, or a buyer the \
-big tool does not focus on, risk is medium or low.
-2. Niche-depth test: the best ideas serve a SMALL, SPECIFIC group you can't split \
-further — "independent physiotherapy clinics", not "healthcare"; "furniture Shopify \
-stores", not "e-commerce". Broad ideas ("all developers", "all SaaS teams") are weak.
+Five tests that DECIDE conviction:
+1. Absorption test: could either a large platform OR the leading vertical tool already \
+used by this buyer add this exact workflow as a normal feature? If yes, ask what depth \
+makes the standalone product hard to copy: workflow history, proprietary corrections, \
+integrations, local rules, distribution, operational data, or a much better UX.
+2. Niche-depth test: is there a specific initial buyer with a shared workflow and a \
+clear way to reach them? The initial market should be narrow enough to design deeply \
+for them, but large enough to expand into adjacent customers or workflows.
 3. Boring test: boring, unglamorous, service-type problems are GOOD — few people want to \
 build them, so there is room. Cool AI ideas are the most crowded and the most absorbable.
+4. Manual-labor test: is a person currently paid to repeatedly do this job? Strong \
+signal: staff, assistant, analyst, coordinator, or contractor does it; work grows with \
+customer volume; buyer already spends salary or outsourcing budget; software could \
+reduce human touches per unit. Weak signal: no one owns the task, or it saves 5 minutes \
+occasionally.
+5. Automation-depth test: if models get better, does this product become stronger, or \
+does the model make the product unnecessary? Strong products own workflow state, \
+integrations, permissions, history, evidence, business rules, exceptions, and actions. \
+Weak products are mainly one prompt wrapped around a model API.
 
 Rules:
 - Write EVERY text field in very simple, plain English: short sentences, everyday words, \
@@ -675,6 +710,15 @@ If the context is thin, say so and lower conviction — don't bluff.
 tool, set is_product=false and lower conviction. But set is_product=true when a small \
 team could sell it as a focused workflow for a narrow group, even if bigger tools cover \
 part of the job.
+- Use `what_people_do_today` to explain the current workaround or manual workflow.
+- Use `job_software_could_take_over` for the broad operational job, not a narrow app \
+feature. Example: "client documentation coordination from request through readiness."
+- Use `what_still_needs_human` for judgment, exceptions, trust, relationships, or legal \
+responsibility that software should not fully own.
+- Use `why_now` for what changed recently: models got good enough, API/platform access \
+changed, regulation changed, labor got expensive, workflow volume increased, a new \
+channel became dominant, or buyers are replacing staff/time with automation. If no \
+clear why-now exists, say "No clear why-now in the evidence."
 - If the context shows pricing or adoption numbers, CITE them in what_exists / \
 demand_signal (e.g. "Portkey ~$49/mo", "Kafka is the default backbone"). If pricing \
 truly isn't there, say "pricing unclear" in three words — don't write a long disclaimer.
@@ -732,10 +776,6 @@ _WEAK_OPPORTUNITY_TERMS = (
     "node.js 20 deprecation",
     "deprecation warning",
     "patched action",
-    "rate limiting",
-    "rate limits",
-    "monitoring tool",
-    "usage analytics",
     "pcos",
     "pmos",
     "pcod",
@@ -746,10 +786,6 @@ _WEAK_OPPORTUNITY_TERMS = (
 _STALE_LEAD_PATTERNS = (
     ("amd", "intel", "gpu"),
     ("non-nvidia", "gpu"),
-    ("client document collection", "accounting"),
-    ("client document collection", "ca firm"),
-    ("document portal", "accounting"),
-    ("document portal", "ca firm"),
     ("caregiver", "medication tracker"),
     ("caregiver", "medication app"),
     ("chronic illness tracker", "symptom"),
@@ -824,6 +860,14 @@ def write_thesis(lead: Opportunity, context: str) -> MarketThesis | None:
 {lead.summary}
 
 Evidence: {lead.evidence}
+
+Current workaround: {lead.current_workaround or '(unknown)'}
+
+Manual steps visible in evidence: {lead.manual_steps or []}
+
+User role: {lead.user_role or '(unknown)'}
+
+Buyer role: {lead.buyer_role or '(unknown)'}
 
 Live web research context (existing tools, pricing, demand — may be empty):
 {context or '(no web research available — judge cautiously and lower conviction)'}
@@ -947,6 +991,12 @@ For each thesis in either section, use one '### <title>' entry in this exact lin
    `**Category:**` the `category` value written nicely — replace underscores with a space \
 and capitalize (e.g. "small_business" → "Small business", "ai_agents" → "AI agents").
    `**Problem:**` the pain in one simple line.
+   `**What people do today:**` from `what_people_do_today`; if empty, infer cautiously \
+from the evidence or write "Unclear from the sources."
+   `**Job software could take over:**` from `job_software_could_take_over`; phrase this \
+as the operational job, not a generic app.
+   `**What still needs a human:**` from `what_still_needs_human`; include judgment, \
+exceptions, trust, relationships, or legal responsibility.
    `**What's already out there:**` the real tools + their prices from `what_exists` \
 (write "No clear competitor yet" if empty). Many tools already there is a GOOD sign — \
 it means people want this.
@@ -958,6 +1008,7 @@ it means people want this.
 `boring_score`/5.
    `**Big-company risk:**` include `big_company_risk` and name the likely absorber if \
 the risk is medium/high.
+   `**Why now:**` from `why_now`; write "No clear why-now in the evidence" if unclear.
    `**Confidence:**` the `conviction` value (high / medium / low), then one short, plain \
 line on the biggest reason it could fail.
    `**Sources:**` Markdown links built ONLY from `sources` — use each entry's `site` as \
@@ -998,8 +1049,12 @@ Keep it short and easy to read. Most confident ideas first. Never invent a URL."
                         f"### {t.title}",
                         f"**Category:** {(t.category or '').replace('_', ' ').title()}",
                         f"**Problem:** {t.problem}",
+                        f"**What people do today:** {t.what_people_do_today or 'Unclear from the sources.'}",
+                        f"**Job software could take over:** {t.job_software_could_take_over or 'Unclear.'}",
+                        f"**What still needs a human:** {t.what_still_needs_human or 'Judgment and exceptions.'}",
                         f"**Who'd pay:** {t.buyer}",
                         f"**First build:** {t.mvp}",
+                        f"**Why now:** {t.why_now or 'No clear why-now in the evidence.'}",
                         f"**Confidence:** {t.conviction}. {t.biggest_risk}",
                         f"**Sources:** {sources_md}" if sources_md else "",
                         "",

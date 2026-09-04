@@ -24,6 +24,16 @@ class PainPoint(BaseModel):
     summary: str = Field(description="One sentence: the problem, stated plainly.")
     category: str = Field(description="One of the configured categories.")
     evidence: str = Field(description="A short quote or paraphrase showing the pain.")
+    current_workaround: str = Field(
+        default="",
+        description="What users do today instead, if visible in the source.",
+    )
+    manual_steps: list[str] = Field(
+        default_factory=list,
+        description="Repeated manual steps in the current workflow, if visible.",
+    )
+    user_role: str = Field(default="", description="The person doing or feeling the work.")
+    buyer_role: str = Field(default="", description="The person likely to pay or approve.")
     source_ids: list[str] = Field(description="ids of the posts this came from.")
     pain: int = Field(description="1-5: how acute/frequent the frustration is.")
     frequency: int = Field(description="1-5: how often this comes up across posts.")
@@ -66,6 +76,18 @@ class MarketThesis(BaseModel):
     title: str = Field(description="Short, concrete name for the opportunity.")
     category: str = Field(default="", description="Category tag (set from the lead).")
     problem: str = Field(description="The pain, in one or two plain sentences.")
+    what_people_do_today: str = Field(
+        default="",
+        description="The current workaround or manual workflow.",
+    )
+    job_software_could_take_over: str = Field(
+        default="",
+        description="The broader operational job software could own end-to-end.",
+    )
+    what_still_needs_human: str = Field(
+        default="",
+        description="The judgment, exception handling, or relationship work humans keep.",
+    )
     what_exists: list[str] = Field(
         description="Existing tools/competitors with pricing where known; empty if greenfield."
     )
@@ -80,6 +102,10 @@ class MarketThesis(BaseModel):
     mvp: str = Field(description="The first concrete thing to build to test it.")
     conviction: str = Field(description="high | medium | low — grounded in the evidence.")
     biggest_risk: str = Field(description="The main reason this could fail.")
+    why_now: str = Field(
+        default="",
+        description="What changed recently that makes this newly painful or buildable.",
+    )
     big_company_risk: str = Field(
         default="unknown",
         description="low | medium | high — risk that a big platform or dominant tool adds it.",

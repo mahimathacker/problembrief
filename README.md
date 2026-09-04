@@ -26,10 +26,14 @@ marketing/creator/agencies.
 Each brief includes:
 
 - **Problem:** the pain people are describing.
+- **What people do today:** the current workaround or manual workflow.
+- **Job software could take over:** the broader operational job, not just an app idea.
+- **What still needs a human:** judgment, exceptions, trust, or relationship work.
 - **What's already out there:** competitors and pricing when found.
 - **Who'd pay:** the likely user or buyer.
 - **How you'd win:** a focused way a small product could compete.
 - **First build:** the smallest useful version to test.
+- **Why now:** what changed that makes the pain more urgent or more buildable.
 - **Confidence:** what could make the idea fail.
 - **Sources:** links back to the original public signals.
 
