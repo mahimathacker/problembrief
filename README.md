@@ -128,6 +128,11 @@ Common settings:
 
 - `RADAR_PROVIDER` — primary LLM provider.
 - `RADAR_FALLBACK_PROVIDERS` — comma-separated fallback providers.
+- `RADAR_BRIEF_MODE` — `issues` for cheap daily new-issue radar, `deep` for full
+  market/pricing theses.
+- `RADAR_ISSUE_TOP_N` — max new issues in the daily issue radar.
+- `RADAR_EXTRACT_BATCH_SIZE` — source items per extraction call.
+- `RADAR_SOURCE_TEXT_CHARS` — max text characters per source item sent to the model.
 - `RADAR_INTERESTS` — interests used to bias the personal-interest score.
 - `RADAR_MAX_PER_SOURCE` — max items fetched per source.
 - `RADAR_GITHUB_RECENCY_DAYS` — only pull recent GitHub issues.

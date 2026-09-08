@@ -112,6 +112,16 @@ def enrich_leads(state: RadarState) -> RadarState:
     raw = state.get("raw_items", [])
     id_to_source = {it.id: it.source for it in raw}
     all_leads = state.get("deduped", [])
+
+    if config.BRIEF_MODE == "issues":
+        leads = _select_diverse(all_leads, config.ISSUE_TOP_N)
+        leads = _ensure_source_slot(leads, all_leads, "reddit_web", id_to_source, config.ISSUE_TOP_N)
+        print(f"[4/6] skipping deep research; sending {len(leads)} new deduped issues…")
+        if leads:
+            cats = ", ".join(o.category or "other" for o in leads)
+            print(f"  - selected categories: {cats}")
+        return {"research_leads": leads, "theses": []}
+
     leads = _select_diverse(all_leads, config.ENRICH_TOP_N)
     leads = _ensure_source_slot(leads, all_leads, "reddit_web", id_to_source, config.ENRICH_TOP_N)
     print(f"[4/6] enriching {len(leads)} leads with live market research…")
@@ -187,12 +197,17 @@ def _filter_and_rank_theses(theses):
 
 def generate_daily_brief(state: RadarState) -> RadarState:
     theses = state.get("theses", [])
+    leads = state.get("research_leads", [])
     raw = state.get("raw_items", [])
-    print(f"[5/6] writing brief from {len(theses)} theses…")
     today = date.today().isoformat()
     id_to_url = {it.id: it.url for it in raw}
     id_to_source = {it.id: it.source for it in raw}
-    brief = llm.write_brief(theses, today, len(raw), id_to_url, id_to_source)
+    if config.BRIEF_MODE == "issues":
+        print(f"[5/6] writing issue radar from {len(leads)} leads…")
+        brief = llm.write_issue_brief(leads, today, len(raw), id_to_url, id_to_source)
+    else:
+        print(f"[5/6] writing brief from {len(theses)} theses…")
+        brief = llm.write_brief(theses, today, len(raw), id_to_url, id_to_source)
     return {"brief_markdown": brief}
 
 
@@ -205,7 +220,8 @@ def save_results(state: RadarState) -> RadarState:
     # Remember what we surfaced today so it won't repeat for DEDUP_DAYS.
     raw = state.get("raw_items", [])
     id_to_url = {it.id: it.url for it in raw}
-    store.record(state.get("theses", []), id_to_url, config.SEEN_RETENTION_DAYS)
+    surfaced = state.get("theses", []) or state.get("research_leads", [])
+    store.record(surfaced, id_to_url, config.SEEN_RETENTION_DAYS)
 
     return {"brief_path": str(path)}
 

@@ -38,6 +38,10 @@ jobs:
           RADAR_GITHUB_OWNER: ${{ vars.RADAR_GITHUB_OWNER || github.repository_owner }}
           RADAR_GITHUB_ENDPOINT: ${{ vars.RADAR_GITHUB_ENDPOINT }}
           RADAR_GITHUB_MAX_PAIN_POINTS: ${{ vars.RADAR_GITHUB_MAX_PAIN_POINTS || '24' }}
+          RADAR_BRIEF_MODE: ${{ vars.RADAR_BRIEF_MODE || 'issues' }}
+          RADAR_ISSUE_TOP_N: ${{ vars.RADAR_ISSUE_TOP_N || '10' }}
+          RADAR_EXTRACT_BATCH_SIZE: ${{ vars.RADAR_EXTRACT_BATCH_SIZE || '25' }}
+          RADAR_SOURCE_TEXT_CHARS: ${{ vars.RADAR_SOURCE_TEXT_CHARS || '2200' }}
           RADAR_MODEL: ${{ vars.RADAR_MODEL || 'claude-opus-4-8' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

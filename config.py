@@ -125,6 +125,11 @@ ENRICH_TOP_N = int(os.getenv("RADAR_ENRICH_TOP_N", "8"))
 # more Tavily usage.
 PRICING_LOOKUPS_PER_LEAD = int(os.getenv("RADAR_PRICING_LOOKUPS_PER_LEAD", "4"))
 
+# Daily output mode:
+# - "issues": cheap daily radar. Sends new, non-duplicate issues directly after dedupe.
+# - "deep": researches each selected lead with web/pricing context and writes full theses.
+BRIEF_MODE = os.getenv("RADAR_BRIEF_MODE", "issues").strip().lower()
+
 # Beyond dev forums: discover real-world pain in a small set of categories. A rotating
 # subset runs each day. Needs TAVILY_API_KEY; skipped without it.
 DISCOVERY_QUERIES = [
@@ -231,7 +236,12 @@ MAX_PAIN_POINTS = int(os.getenv("RADAR_MAX_PAIN_POINTS", "40"))
 GEMINI_MAX_PAIN_POINTS = int(os.getenv("RADAR_GEMINI_MAX_PAIN_POINTS", "30"))
 GITHUB_MODELS_MAX_PAIN_POINTS = int(os.getenv("RADAR_GITHUB_MAX_PAIN_POINTS", "24"))
 
-# How many opportunities make the brief.
+# Daily issue-radar output size and extraction cost controls.
+ISSUE_TOP_N = int(os.getenv("RADAR_ISSUE_TOP_N", "10"))
+EXTRACT_BATCH_SIZE = int(os.getenv("RADAR_EXTRACT_BATCH_SIZE", "25"))
+SOURCE_TEXT_CHARS = int(os.getenv("RADAR_SOURCE_TEXT_CHARS", "2200"))
+
+# How many opportunities make the deep brief.
 TOP_N = int(os.getenv("RADAR_TOP_N", "5"))
 
 # --- Output --------------------------------------------------------------
