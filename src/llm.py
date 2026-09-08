@@ -303,7 +303,7 @@ def _coerce_schema_payload(data, schema):
                     continue
                 item.setdefault("category", config.CATEGORIES[0])
                 if item.get("category") not in config.CATEGORIES:
-                    item["category"] = config.CATEGORIES[0]
+                    continue
                 for key, value in _DEFAULT_PAIN_SCORES.items():
                     item.setdefault(key, value)
                 item.setdefault("source_ids", [])
@@ -326,7 +326,7 @@ def _coerce_schema_payload(data, schema):
                     continue
                 item.setdefault("category", config.CATEGORIES[0])
                 if item.get("category") not in config.CATEGORIES:
-                    item["category"] = config.CATEGORIES[0]
+                    continue
                 for key, value in _DEFAULT_PAIN_SCORES.items():
                     item.setdefault(key, value)
                 item.setdefault("source_ids", [])
@@ -504,7 +504,7 @@ Only extract problems that fit one of these focused categories:
 - `fitness`: gyms, studios, trainers, coaches, and wellness operators.
 - `health`: patient, caregiver, clinic, and health-operations problems.
 - `fashion_beauty`: fashion, beauty, salons, retail, services, and commerce.
-- `accounting_ca`: accountants, bookkeepers, auditors, CA firms, tax, and finance ops.
+- `accounting_ca`: accounting, bookkeeping, audit, tax, compliance, and firm-operations problems.
 - `marketing_creator_agencies`: marketers, creators, agencies, and client-service teams.
 
 If a post does not fit these categories, skip it. Do not create an `other` category.
@@ -527,6 +527,11 @@ marketing/creator/agency pain, extract it too.
 problem underneath the post: where time, money, trust, compliance, handoffs, decisions, \
 visibility, or accountability break down. Do not default to the first common app idea \
 for that category.
+- For accounting/CA, do not default to generic document collection, client portals, or \
+practice-management software. Extract those only when the evidence shows a fresh, \
+specific, costly workflow failure. Otherwise look for different firm issues: review \
+loops, reconciliation exceptions, deadline risk, write-offs, handoffs, quality control, \
+tax/audit judgment, client communication, pricing, staffing, or compliance changes.
 - Look for MANUAL JOBS, not only complaints. Ask: what repeated sequence of work is a \
 person doing today? Examples: collecting inputs, checking them, moving data between \
 systems, following up, reconciling, reviewing exceptions, creating reports, updating \
@@ -547,9 +552,8 @@ pain and small-business/vertical pain, keep at least one of each if both are con
 developers OR everyday/non-technical users. Real impact on real people matters more \
 than novelty or cleverness.
 - Prefer specific problems ("X has no good way to do Y") over broad topics ("AI is hard").
-- State the high-level pain first, then the specific evidence. Example style: \
-"Small firms lose control of deadline-sensitive client work across email, files, and \
-approvals" rather than "build a client document portal."
+- State the high-level pain first, then the specific evidence. Do not phrase the \
+summary as an app, dashboard, portal, or assistant. Phrase it as the work breaking down.
 - The goal is a HIGH-QUALITY PRODUCT OPPORTUNITY — a real problem with a clear user, \
 a believable buyer/adopter, repeated or intense pain, and a plausible wedge a small \
 team could ship. Useful tools are welcome, but only if they could become a durable \
@@ -629,7 +633,9 @@ def extract_pain_points(items: list[SourceItem], batch_size: int = 15) -> list[P
     for start in range(0, len(items), batch_size):
         batch = items[start : start + batch_size]
         batch_no = start // batch_size + 1
-        out.extend(extract_batch(batch, str(batch_no)))
+        out.extend(
+            p for p in extract_batch(batch, str(batch_no)) if p.category in config.CATEGORIES
+        )
         print(f"  - extracted from batch {batch_no}: {len(out)} total")
 
     from collections import Counter
@@ -655,10 +661,8 @@ feature-shaped or vendor-adjacent ideas.
 Rules:
 - Merge only real duplicates / near-duplicates (the same core problem); combine their \
 source_ids. Do NOT merge clearly different problems together.
-- Preserve distinct workflow breakdowns inside the same category. For example, in \
-accounting/CA do not merge audit evidence, tax deadline tracking, reconciliation \
-exceptions, review approvals, client communication, and billing leakage into one \
-"document collection" or "practice management" idea.
+- Preserve distinct workflow breakdowns inside the same category. Do not merge different \
+manual jobs into one generic "management platform" idea.
 - Keep EVERY distinct pain, across ALL categories. Do not collapse to a few themes and \
 do not let one category (like AI) crowd out the rest. Return the full distinct set — \
 typically most of the input.
@@ -712,7 +716,7 @@ team could sell it as a focused workflow for a narrow group, even if bigger tool
 part of the job.
 - Use `what_people_do_today` to explain the current workaround or manual workflow.
 - Use `job_software_could_take_over` for the broad operational job, not a narrow app \
-feature. Example: "client documentation coordination from request through readiness."
+feature.
 - Use `what_still_needs_human` for judgment, exceptions, trust, relationships, or legal \
 responsibility that software should not fully own.
 - Use `why_now` for what changed recently: models got good enough, API/platform access \
@@ -791,6 +795,132 @@ _STALE_LEAD_PATTERNS = (
     ("chronic illness tracker", "symptom"),
 )
 
+_GENERIC_ACCOUNTING_DOC_TERMS = (
+    "client document collection",
+    "document collection",
+    "document portal",
+    "client portal",
+    "practice management",
+    "request documents",
+    "collect documents",
+)
+
+_ACCOUNTING_SPECIFIC_TERMS = (
+    "reconciliation",
+    "exception",
+    "deadline",
+    "write-off",
+    "write off",
+    "handoff",
+    "review loop",
+    "quality control",
+    "tax notice",
+    "audit evidence",
+    "gst",
+    "client communication",
+    "pricing",
+    "staffing",
+    "capacity",
+    "approval",
+    "duplicate",
+    "version",
+    "whatsapp",
+    "email chain",
+)
+
+_BRIEF_IDEA_CACHE: list[str] | None = None
+_BRIEF_STOPWORDS = {
+    "about",
+    "after",
+    "again",
+    "already",
+    "because",
+    "being",
+    "build",
+    "business",
+    "could",
+    "daily",
+    "first",
+    "from",
+    "have",
+    "into",
+    "need",
+    "needs",
+    "people",
+    "problem",
+    "software",
+    "their",
+    "there",
+    "today",
+    "tools",
+    "users",
+    "when",
+    "with",
+    "work",
+    "workflow",
+}
+
+
+def _idea_terms(text: str) -> set[str]:
+    return {
+        w
+        for w in re.findall(r"[a-z0-9][a-z0-9-]{2,}", text.lower())
+        if w not in _BRIEF_STOPWORDS and not w.isdigit()
+    }
+
+
+def _existing_brief_idea_texts() -> list[str]:
+    """Load prior brief titles/problems so today's leads do not repeat old ideas."""
+    global _BRIEF_IDEA_CACHE
+    if _BRIEF_IDEA_CACHE is not None:
+        return _BRIEF_IDEA_CACHE
+
+    ideas: list[str] = []
+    for path in sorted(config.BRIEFS_DIR.glob("*.md")):
+        try:
+            text = path.read_text()
+        except Exception:
+            continue
+        current_title = ""
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("### "):
+                current_title = line.removeprefix("### ").strip()
+                if current_title:
+                    ideas.append(current_title)
+            elif line.startswith("**Problem:**"):
+                problem = line.removeprefix("**Problem:**").strip()
+                if problem:
+                    ideas.append(f"{current_title} {problem}".strip())
+    _BRIEF_IDEA_CACHE = ideas
+    return ideas
+
+
+def _matches_existing_brief(o: Opportunity, text: str) -> bool:
+    candidate_terms = _idea_terms(text)
+    if len(candidate_terms) < 4:
+        return False
+    for old in _existing_brief_idea_texts():
+        old_terms = _idea_terms(old)
+        if len(old_terms) < 4:
+            continue
+        overlap = len(candidate_terms & old_terms)
+        smaller = min(len(candidate_terms), len(old_terms))
+        union = len(candidate_terms | old_terms)
+        containment = overlap / smaller if smaller else 0
+        jaccard = overlap / union if union else 0
+        if containment >= 0.62 or jaccard >= 0.42:
+            return True
+    return False
+
+
+def _is_generic_accounting_doc_lead(o: Opportunity, text: str) -> bool:
+    if o.category != "accounting_ca":
+        return False
+    if not any(term in text for term in _GENERIC_ACCOUNTING_DOC_TERMS):
+        return False
+    return not any(term in text for term in _ACCOUNTING_SPECIFIC_TERMS)
+
 
 def _passes_lead_bar(o: Opportunity) -> bool:
     """A real, concrete, buildable pain that isn't junk. Whether the MARKET is real is
@@ -803,7 +933,28 @@ def _passes_lead_bar(o: Opportunity) -> bool:
         return False
     if any(all(term in text for term in terms) for terms in _STALE_LEAD_PATTERNS):
         return False
+    if _is_generic_accounting_doc_lead(o, text):
+        return False
+    if _matches_existing_brief(o, text):
+        return False
     return True
+
+
+def _lead_reject_reason(o: Opportunity) -> str:
+    if o.pain < 4:
+        return f"pain too low ({o.pain})"
+    if o.buildability < 3:
+        return f"buildability too low ({o.buildability})"
+    text = " ".join((o.summary, o.evidence, o.category)).lower()
+    if any(term in text for term in _WEAK_OPPORTUNITY_TERMS):
+        return "weak/fluffy term"
+    if any(all(term in text for term in terms) for terms in _STALE_LEAD_PATTERNS):
+        return "stale repeated theme"
+    if _is_generic_accounting_doc_lead(o, text):
+        return "generic accounting docs/client-portal repeat"
+    if _matches_existing_brief(o, text):
+        return "already covered in existing briefs"
+    return "unknown"
 
 
 def dedupe(
@@ -837,7 +988,7 @@ def dedupe(
             return direct
         else:
             raise
-    opps = parsed.opportunities if parsed else []
+    opps = [o for o in (parsed.opportunities if parsed else []) if o.category in config.CATEGORIES]
     for o in opps:
         o.composite = _composite(o)
     print(f"  - dedupe produced {len(opps)} candidate leads")
@@ -846,7 +997,7 @@ def dedupe(
     for o in opps:
         (leads if _passes_lead_bar(o) else dropped).append(o)
     for o in dropped:
-        print(f"    dropped (junk/too small): [{o.category}] {o.summary}")
+        print(f"    dropped ({_lead_reject_reason(o)}): [{o.category}] {o.summary}")
     leads.sort(key=lambda o: o.composite, reverse=True)
     print(f"  - {len(leads)} real leads kept:")
     for o in leads:
