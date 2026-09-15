@@ -172,6 +172,108 @@ Add these in GitHub repo settings:
 
 Then run it manually from the Actions tab or wait for the scheduled cron.
 
+## Project Context For Agents
+
+Use this section when handing the repo to another AI agent.
+
+### Product Direction
+
+ProblemBrief is a source-backed research agent for finding real problems, not a random
+startup idea generator. It should surface **new issues** from messy public signals and
+help a builder decide what is worth validating.
+
+The product is intentionally broader than dev tools. Current research categories are:
+
+- DevTools
+- AI agents
+- Small business
+- Real estate
+- Fitness
+- General health
+- Fashion/beauty
+- Accounting/CA
+- Marketing/creator/agencies
+
+Do not position it as only an AI tooling radar.
+
+### Important Decisions
+
+- Daily runs should default to `RADAR_BRIEF_MODE=issues` to control cost.
+- `issues` mode extracts, dedupes, filters, and sends new issues directly.
+- `deep` mode is for manual or weekly richer research with market/pricing theses.
+- Do not use the Reddit API right now. Reddit discovery is through public web search
+  only.
+- Ideas must be new compared with existing `briefs/*.md`.
+- The agent should find problems and workflow breakdowns, not phrase output as finished
+  app ideas.
+- Accounting/CA should stay in scope, but generic document collection, client portals,
+  and practice-management ideas should be avoided unless the evidence is unusually
+  specific and costly.
+- PCOS/PCOD should not be its own category because it kept repeating; use general
+  health instead.
+
+### Quality Rules
+
+The extraction prompt should prefer:
+
+- real workflows breaking down
+- repeated manual jobs
+- current workarounds
+- clear user/buyer roles
+- evidence from source text or comments
+- boring, operational problems
+- narrow reachable users
+
+The extraction prompt should reject:
+
+- generic productivity/self-improvement posts
+- tool-overload/documentation journey posts
+- one-feature requests
+- vendor bugs where the vendor should fix it
+- wrapper/list/guide/browser-extension ideas
+- stale themes already covered in previous briefs
+
+### Cost Notes
+
+Deep mode can get expensive because it adds:
+
+- Tavily market research
+- pricing lookups
+- one thesis LLM call per selected lead
+- a final LLM writing call
+
+Daily issue mode avoids those calls. Current cost-control defaults:
+
+```env
+RADAR_BRIEF_MODE=issues
+RADAR_ISSUE_TOP_N=10
+RADAR_EXTRACT_BATCH_SIZE=25
+RADAR_SOURCE_TEXT_CHARS=2200
+```
+
+Switch to deep mode only when richer validation is needed:
+
+```env
+RADAR_BRIEF_MODE=deep
+```
+
+### Known Provider Notes
+
+- OpenAI is the default quality path.
+- Gemini can be used as fallback, but may rate limit and may feel weaker for this use
+  case.
+- GitHub Models may return `410 Gone` during retirement/brownout windows.
+- Anthropic requires enough API credits.
+
+### Main Files To Edit
+
+- `config.py` — categories, queries, provider settings, budget knobs.
+- `src/llm.py` — extraction/dedupe prompts, filters, issue/deep brief writers.
+- `src/graph.py` — LangGraph pipeline and `issues` vs `deep` routing.
+- `src/sources.py` — source fetching and search query behavior.
+- `src/enrich.py` — Tavily market and pricing research for deep mode.
+- `.github/workflows/daily.yml` — scheduled run settings.
+
 ## Project Structure
 
 ```text
