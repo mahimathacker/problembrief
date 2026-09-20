@@ -240,6 +240,15 @@ GITHUB_MODELS_MAX_PAIN_POINTS = int(os.getenv("RADAR_GITHUB_MAX_PAIN_POINTS", "2
 ISSUE_TOP_N = int(os.getenv("RADAR_ISSUE_TOP_N", "10"))
 EXTRACT_BATCH_SIZE = int(os.getenv("RADAR_EXTRACT_BATCH_SIZE", "25"))
 SOURCE_TEXT_CHARS = int(os.getenv("RADAR_SOURCE_TEXT_CHARS", "2200"))
+# A second, source-grounded LLM pass rejects plausible-sounding ideas that are not
+# actually supported by the post, are merely vendor feature requests, or have no
+# credible software buyer. Accuracy matters more than one extra call in issue mode.
+ENABLE_OPPORTUNITY_CRITIC = os.getenv("RADAR_ENABLE_OPPORTUNITY_CRITIC", "1") not in (
+    "0",
+    "false",
+    "False",
+)
+CRITIC_MAX_CANDIDATES = int(os.getenv("RADAR_CRITIC_MAX_CANDIDATES", "20"))
 
 # How many opportunities make the deep brief.
 TOP_N = int(os.getenv("RADAR_TOP_N", "5"))

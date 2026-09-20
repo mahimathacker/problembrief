@@ -11,7 +11,15 @@ import re
 import time
 
 import config
-from src.schema import Deduped, Extraction, MarketThesis, Opportunity, PainPoint, SourceItem
+from src.schema import (
+    Deduped,
+    Extraction,
+    MarketThesis,
+    Opportunity,
+    OpportunityReview,
+    PainPoint,
+    SourceItem,
+)
 
 _CATS = ", ".join(config.CATEGORIES)
 _INTERESTS = ", ".join(config.INTERESTS)
@@ -570,6 +578,11 @@ explicit team budget or compliance/revenue risk.
 - Reject vendor/platform complaints when the obvious solution belongs to the vendor \
 itself. Only extract them when an independent third-party wedge is clearly useful and \
 buyers already spend money to manage that risk.
+- Missing voice, accessibility, import/export, UI, or configuration options in one named \
+product are vendor feature requests, not independent product opportunities. Skip them.
+- Reject physical or lifestyle pain (posture, exercise habits, device ergonomics, sleep, \
+diet) when the evidence does not contain a broken software or administrative workflow. \
+A real human problem is not automatically a buildable software product problem.
 - Reject weak market logic: if the only buyer is a vague group like "developers", \
 "SaaS companies", "platforms", or "enterprises" without evidence of budget, adoption, \
 switching, compliance pressure, revenue loss, or repeated workaround pain, do not extract it.
@@ -677,6 +690,33 @@ keep buildability and personal_interest as your best estimate.
 - Keep the clearest one-sentence summary and the single best piece of evidence.
 - Leave `composite` at 0 — it is computed downstream.
 - Do not invent new pain points; only consolidate what's given."""
+
+
+_REVIEW_SYS = """You are the final quality-control editor for a source-backed problem \
+radar. Review each candidate against its ORIGINAL SOURCE EXCERPTS. Accuracy and useful \
+product-discovery signal matter more than filling a quota.
+
+Set keep=true only when ALL of these are true:
+1. The source directly supports the problem. The candidate does not broaden, embellish, \
+or infer a widespread problem from a thin quote.
+2. It describes meaningful pain: a repeated workflow, costly failure, blocked work, \
+money/time loss, compliance/revenue risk, or corroboration. One person's preference, \
+minor annoyance, or isolated lifestyle anecdote is not enough.
+3. An independent small software product could own a meaningful workflow around it. \
+Reject a missing feature, accessibility option, bug, compatibility fix, or setting that \
+the named vendor should add to its own product.
+4. Software is actually a plausible solution. Reject primarily physical, medical, \
+behavioral, or ergonomic problems unless the source shows a specific software workflow \
+that is failing.
+5. There is a specific user and a credible adopter or buyer. Do not accept a buyer that \
+was merely guessed by the extractor.
+6. The evidence is actionable enough to validate further: it shows a current process, \
+workaround, attempted purchase/switch, multiple affected people, or concrete impact.
+
+Reject generic market observations, security/news claims with no user workflow, product \
+launch descriptions presented as pain, and solutions in search of a problem. Do not keep \
+a weak candidate to preserve category diversity. Return exactly one decision for every \
+candidate index and give a short, concrete reason."""
 
 
 _THESIS_SYS = """You are a pragmatic founder writing a grounded BUILDABILITY THESIS for \
@@ -961,6 +1001,95 @@ def _lead_reject_reason(o: Opportunity) -> str:
     return "unknown"
 
 
+def _normalize_source_ids(
+    opportunities: list[Opportunity], source_items: list[SourceItem]
+) -> tuple[list[Opportunity], list[Opportunity]]:
+    """Remove invented source ids and reject leads with no original source."""
+    valid_ids = {item.id for item in source_items}
+    kept: list[Opportunity] = []
+    rejected: list[Opportunity] = []
+    for opportunity in opportunities:
+        opportunity.source_ids = list(
+            dict.fromkeys(sid for sid in opportunity.source_ids if sid in valid_ids)
+        )
+        if not opportunity.source_ids:
+            rejected.append(opportunity)
+            continue
+
+        # One thread may contain agreement in its comments, but cannot support a
+        # cross-source frequency score of 4 or 5.
+        if len(opportunity.source_ids) == 1:
+            opportunity.frequency = min(opportunity.frequency, 3)
+        opportunity.composite = _composite(opportunity)
+        kept.append(opportunity)
+    return kept, rejected
+
+
+def _review_opportunities(
+    opportunities: list[Opportunity], source_items: list[SourceItem]
+) -> list[Opportunity]:
+    """Run a source-grounded precision pass after extraction and deduplication."""
+    if not opportunities or not config.ENABLE_OPPORTUNITY_CRITIC:
+        return opportunities
+
+    # Review the strongest finite set. This bounds prompt size and prevents a weak
+    # tail from reaching the brief merely because it was not reviewed.
+    opportunities = sorted(opportunities, key=lambda o: o.composite, reverse=True)[
+        : config.CRITIC_MAX_CANDIDATES
+    ]
+    by_id = {item.id: item for item in source_items}
+    candidates = []
+    for index, opportunity in enumerate(opportunities):
+        sources = []
+        for source_id in opportunity.source_ids:
+            item = by_id[source_id]
+            sources.append(
+                {
+                    "id": item.id,
+                    "source": item.source,
+                    "title": item.title,
+                    "excerpt": (item.text or "")[: min(config.SOURCE_TEXT_CHARS, 1400)],
+                    "points": item.points,
+                    "comments": item.num_comments,
+                }
+            )
+        candidates.append(
+            {
+                "index": index,
+                "candidate": opportunity.model_dump(exclude={"composite"}),
+                "original_sources": sources,
+            }
+        )
+
+    try:
+        review = _parse(
+            _REVIEW_SYS,
+            "Review these candidates:\n" + json.dumps(candidates),
+            OpportunityReview,
+            6000,
+        )
+    except Exception as error:
+        # Accuracy is the purpose of this pass. Publishing unreviewed leads would
+        # silently restore the failure mode this gate prevents, so fail closed.
+        print(f"  ! opportunity critic unavailable; rejecting unreviewed leads: {error}")
+        return []
+
+    decisions = {decision.index: decision for decision in review.decisions} if review else {}
+    kept: list[Opportunity] = []
+    for index, opportunity in enumerate(opportunities):
+        decision = decisions.get(index)
+        if decision and decision.keep:
+            kept.append(opportunity)
+        else:
+            reason = decision.reason if decision else "critic returned no decision"
+            print(
+                f"    rejected by critic ({reason}): "
+                f"[{opportunity.category}] {opportunity.summary}"
+            )
+    print(f"  - source-grounded critic kept {len(kept)}/{len(opportunities)} leads")
+    return kept
+
+
 def dedupe(
     pain_points: list[PainPoint], source_items: list[SourceItem] | None = None
 ) -> list[Opportunity]:
@@ -989,7 +1118,7 @@ def dedupe(
             print("  ! dedupe skipped after provider limits/unavailability; using top extracted pains")
             direct = [Opportunity(**p.model_dump(), composite=_composite(p)) for p in ranked[:10]]
             direct.sort(key=lambda o: o.composite, reverse=True)
-            return direct
+            parsed = Deduped(opportunities=direct)
         else:
             raise
     opps = [o for o in (parsed.opportunities if parsed else []) if o.category in config.CATEGORIES]
@@ -997,11 +1126,18 @@ def dedupe(
         o.composite = _composite(o)
     print(f"  - dedupe produced {len(opps)} candidate leads")
 
+    if source_items is not None:
+        opps, ungrounded = _normalize_source_ids(opps, source_items)
+        for o in ungrounded:
+            print(f"    dropped (no valid original source): [{o.category}] {o.summary}")
+
     leads, dropped = [], []
     for o in opps:
         (leads if _passes_lead_bar(o) else dropped).append(o)
     for o in dropped:
         print(f"    dropped ({_lead_reject_reason(o)}): [{o.category}] {o.summary}")
+    if source_items is not None:
+        leads = _review_opportunities(leads, source_items)
     leads.sort(key=lambda o: o.composite, reverse=True)
     print(f"  - {len(leads)} real leads kept:")
     for o in leads:
